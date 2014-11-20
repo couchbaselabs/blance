@@ -27,11 +27,6 @@ func rebalancePartitions(
 	modelStateConstraints map[string]int, // Keyed by stateName.
 	partitionWeights map[string]int, // Keyed by partitionName.
 ) PartitionMap {
-	// Key is stateName, value is {node: count}.
-	var stateNodeCounts map[string]map[string]int
-
-	stateNodeCounts = countStateNodes(prevMap, partitionWeights)
-
 	// Start by filling out nextPartitions as a deep clone of
 	// prevMap.Partitions, but filter out the to-be-removed nodes.
 	nextPartitions := prevMap.toArrayCopy()
@@ -41,13 +36,21 @@ func rebalancePartitions(
 	}
 	sort.Sort(&partitionSorter{a: nextPartitions})
 
+	// Key is stateName, value is {node: count}.
+	var stateNodeCounts map[string]map[string]int
+
+	stateNodeCounts = countStateNodes(prevMap, partitionWeights)
+
+	// Helper function to return an ordered array of candidates nodes
+	// to assign to a partition.
 	findBestNodes := func(partition *Partition, stateName string,
 		constraints int, nodeToNodeCounts map[string]map[string]int) []string {
 		return nil // TODO.
 	}
 
-	// Given a PartitionModel state name and its constraints, for
-	// every partition, assign nodes by mutating nextPartitions.
+	// Helper function that given a PartitionModel state name and its
+	// constraints, for every partition, assign nodes by mutating
+	// nextPartitions.
 	assignStateToPartitions := func(stateName string, constraints int) {
 		// Sort the partitions to help reach a better assignment.
 		p := &partitionSorter{
