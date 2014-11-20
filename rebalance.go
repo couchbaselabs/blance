@@ -16,6 +16,7 @@ package blance
 import (
 	"fmt"
 	"sort"
+	"strconv"
 )
 
 func rebalancePartitions(
@@ -185,15 +186,23 @@ func (r *partitionSorter) Swap(i, j int) {
 
 func (r *partitionSorter) Entry(i int) []string {
 	partitionName := r.a[i].Name
+	partitionNameStr := partitionName
 
-	// Calculate space padded (for sortability) partition weight.
+	// If the partitionName looks like a positive integer, then
+	// zero-pad it for sortability.
+	partitionN, err := strconv.Atoi(partitionName)
+	if err != nil && partitionN >= 0 {
+		partitionNameStr = fmt.Sprintf("%10d", partitionN)
+	}
+
+	// Calculate partition weight, and zero-pad it for sortability.
 	partitionWeight := 1
 	if r.partitionWeights != nil {
 		if w, exists := r.partitionWeights[partitionName]; exists {
 			partitionWeight = w
 		}
 	}
-	partitionWeightStr := fmt.Sprintf("%20d", partitionWeight)
+	partitionWeightStr := fmt.Sprintf("%10d", partitionWeight)
 
 	// First, favor partitions on nodes that are to-be-removed.
 	if r.prevPartitions != nil &&
@@ -202,7 +211,7 @@ func (r *partitionSorter) Entry(i int) []string {
 		lastPartitionNBS := lastPartition.NodesByState[r.stateName]
 		if lastPartitionNBS != nil &&
 			len(StringsIntersectStrings(lastPartitionNBS, r.nodesToRemove)) > 0 {
-			return []string{"0", partitionWeightStr, partitionName}
+			return []string{"0", partitionWeightStr, partitionNameStr}
 		}
 	}
 
@@ -211,9 +220,9 @@ func (r *partitionSorter) Entry(i int) []string {
 	if r.nodesToAdd != nil {
 		fnbs := flattenNodesByState(r.a[i].NodesByState)
 		if len(StringsIntersectStrings(fnbs, r.nodesToAdd)) <= 0 {
-			return []string{"1", partitionWeightStr, partitionName}
+			return []string{"1", partitionWeightStr, partitionNameStr}
 		}
 	}
 
-	return []string{"2", partitionWeightStr, partitionName}
+	return []string{"2", partitionWeightStr, partitionNameStr}
 }
