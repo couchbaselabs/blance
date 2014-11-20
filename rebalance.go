@@ -24,22 +24,30 @@ func rebalancePartitions(
 	nodesToRemove []string,
 	nodesToAdd []string,
 	model PartitionModel,
-	// Keyed by same key as the key to partitionModel.States, e.g.,
-	// "master", "slave", "dead", etc.
-	modelStateConstraints map[string]int,
-	partitionWeights map[string]int,
+	modelStateConstraints map[string]int, // Keyed by stateName.
+	partitionWeights map[string]int, // Keyed by partitionName.
 ) PartitionMap {
+	// Key is stateName, value is {node: count}.
+	var stateNodeCounts map[string]map[string]int
+
+	stateNodeCounts = countStateNodes(prevMap, partitionWeights)
+
 	// Start by filling out nextPartitions as a deep clone of
 	// prevMap.Partitions, but filter out the to-be-removed nodes.
 	nextPartitions := prevMap.toArrayCopy()
 	for _, partition := range nextPartitions {
 		partition.NodesByState =
-			removeNodesFromNodesByState(partition.NodesByState, nodesToRemove)
+			removeNodesFromNodesByState(partition.NodesByState, nodesToRemove, nil)
 	}
 	sort.Sort(&partitionSorter{a: nextPartitions})
 
+	findBestNodes := func(partition *Partition, stateName string,
+		constraints int, nodeToNodeCounts map[string]map[string]int) []string {
+		return nil // TODO.
+	}
+
 	// Given a PartitionModel state name and its constraints, for
-	// every partition, assign nodes.
+	// every partition, assign nodes by mutating nextPartitions.
 	assignStateToPartitions := func(stateName string, constraints int) {
 		// Sort the partitions to help reach a better assignment.
 		p := &partitionSorter{
@@ -52,7 +60,43 @@ func rebalancePartitions(
 		}
 		sort.Sort(p)
 
-		// TODO: complete the rest of the algorithm.
+		// Key is higherPriorityNode, value is {lowerPriorityNode: count}.
+		nodeToNodeCounts := make(map[string]map[string]int)
+
+		for _, partition := range p.a {
+			partitionWeight := 1
+			if partitionWeights != nil {
+				w, exists := partitionWeights[partition.Name]
+				if exists {
+					partitionWeight = w
+				}
+			}
+
+			incStateNodeCounts := func(stateName string, nodes []string) {
+				adjustStateNodeCounts(stateNodeCounts, stateName, nodes,
+					partitionWeight)
+			}
+			decStateNodeCounts := func(stateName string, nodes []string) {
+				adjustStateNodeCounts(stateNodeCounts, stateName, nodes,
+					-partitionWeight)
+			}
+
+			nodesToAssign :=
+				findBestNodes(partition, stateName, constraints, nodeToNodeCounts)
+
+			partition.NodesByState =
+				removeNodesFromNodesByState(partition.NodesByState,
+					partition.NodesByState[stateName],
+					decStateNodeCounts)
+			partition.NodesByState =
+				removeNodesFromNodesByState(partition.NodesByState,
+					nodesToAssign,
+					decStateNodeCounts)
+
+			partition.NodesByState[stateName] = nodesToAssign
+
+			incStateNodeCounts(stateName, nodesToAssign)
+		}
 	}
 
 	// Run through the sorted partition states (master, slave, etc)
@@ -101,18 +145,66 @@ func copyNodesByState(nbs map[string][]string) map[string][]string {
 	return rv
 }
 
+func adjustStateNodeCounts(stateNodeCounts map[string]map[string]int,
+	stateName string, nodes []string, amt int) {
+	for _, node := range nodes {
+		s, exists := stateNodeCounts[stateName]
+		if !exists || s == nil {
+			s = make(map[string]int)
+			stateNodeCounts[stateName] = s
+		}
+		s[node] = s[node] + amt
+	}
+}
+
+// Example, with input partitionMap of...
+//   { "0": { NodesByState: {"master": ["a"], "slave": ["b", "c"]} },
+//     "1": { NodesByState: {"master": ["b"], "slave": ["c"]} } }
+// then return value will be...
+//   { "master": { "a": 1, "b": 1 },
+//     "slave": { "b": 1, "c": 2 } }
+func countStateNodes(partitionMap PartitionMap,
+	partitionWeights map[string]int) map[string]map[string]int {
+	rv := make(map[string]map[string]int)
+	for partitionName, partition := range partitionMap {
+		for stateName, nodes := range partition.NodesByState {
+			for _, node := range nodes {
+				s := rv[stateName]
+				if s == nil {
+					s = make(map[string]int)
+					rv[stateName] = s
+				}
+				partitionWeight := 1
+				if partitionWeights != nil {
+					w, exists := partitionWeights[partitionName]
+					if exists {
+						partitionWeight = w
+					}
+				}
+				s[node] = s[node] + partitionWeight
+			}
+		}
+	}
+	return rv
+}
+
 // --------------------------------------------------------
 
-// Returns a copy of nodesByState but with nodes removed.
-// Example, when removeNodes == ["a"] and
-// nodesByState == {"master": ["a"], "slave": ["b"]},
-// then result will be {"master": [], "slave": ["b"]}.
+// Returns a copy of nodesByState but with nodes removed.  Example,
+// when removeNodes == ["a"] and nodesByState == {"master": ["a"],
+// "slave": ["b"]}, then result will be {"master": [], "slave":
+// ["b"]}.  Optional callback is invoked with the nodes that will
+// actually be removed.
 func removeNodesFromNodesByState(
 	nodesByState map[string][]string,
 	removeNodes []string,
+	cb func(stateName string, nodesToBeRemoved []string),
 ) map[string][]string {
 	rv := make(map[string][]string)
 	for stateName, nodes := range nodesByState {
+		if cb != nil {
+			cb(stateName, StringsIntersectStrings(nodes, removeNodes))
+		}
 		rv[stateName] = StringsRemoveStrings(nodes, removeNodes)
 	}
 	return rv
