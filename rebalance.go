@@ -9,8 +9,8 @@
 //  express or implied. See the License for the specific language
 //  governing permissions and limitations under the License.
 
-// The blance package provides a simple partition rebalancing
-// algorithm, using a greedy, single-pass, heuristic approach.
+// The blance package provides a partition rebalancing algorithm,
+// using a greedy, single-pass, heuristic approach.
 package blance
 
 import (
@@ -18,31 +18,7 @@ import (
 	"sort"
 )
 
-type PartitionMap struct {
-	Partitions []*Partition
-}
-
-type Partition struct {
-	// Name must be unique within a PartitionMap.Partitions.
-	Name string
-
-	// Key is stateName, value is array of node names.
-	NodesByState map[string][]string
-}
-
-type PartitionModel struct {
-	// Keyed by stateName, like "master", "slave", "dead", etc.
-	States map[string]*PartitionModelState
-}
-
-type PartitionModelState struct {
-	// Priority of zero is the highest.  e.g., "master" Priority
-	// should be < than "slave" Priority.
-	Priority    int
-	Constraints int
-}
-
-func RebalancePartitions(
+func rebalancePartitions(
 	prevMap *PartitionMap,
 	nodesToRemove []string,
 	nodesToAdd []string,
