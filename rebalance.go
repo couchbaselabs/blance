@@ -22,7 +22,7 @@ func rebalancePartitions(
 	prevMap PartitionMap,
 	nodesToRemove []string,
 	nodesToAdd []string,
-	model *PartitionModel,
+	model PartitionModel,
 	// Keyed by same key as the key to partitionModel.States, e.g.,
 	// "master", "slave", "dead", etc.
 	modelStateConstraints map[string]int,
@@ -58,16 +58,16 @@ func rebalancePartitions(
 	// that have constraints and invoke assignStateToPartitions().
 	pms := &stateNameSorter{
 		m: model,
-		s: make([]string, 0, len(model.States)),
+		s: make([]string, 0, len(model)),
 	}
-	for stateName, _ := range model.States {
+	for stateName, _ := range model {
 		pms.s = append(pms.s, stateName)
 	}
 	sort.Sort(pms)
 	for _, stateName := range pms.s {
 		constraints, exists := modelStateConstraints[stateName]
 		if !exists {
-			modelState, exists := model.States[stateName]
+			modelState, exists := model[stateName]
 			if exists && modelState != nil {
 				constraints = modelState.Constraints
 			}
@@ -131,7 +131,7 @@ func flattenNodesByState(nodesByState map[string][]string) []string {
 
 // Does ORDER BY m.States[stateName].Priority ASC, stateName ASC".
 type stateNameSorter struct {
-	m *PartitionModel
+	m PartitionModel
 	s []string // Mutated array of partition model state names.
 }
 
@@ -140,8 +140,9 @@ func (pms *stateNameSorter) Len() int {
 }
 
 func (pms *stateNameSorter) Less(i, j int) bool {
-	return pms.m.States[pms.s[i]].Priority < pms.m.States[pms.s[j]].Priority ||
-		pms.s[i] < pms.s[j]
+	iname, jname := pms.s[i], pms.s[j]
+
+	return pms.m[iname].Priority < pms.m[jname].Priority || iname < jname
 }
 
 func (pms *stateNameSorter) Swap(i, j int) {
