@@ -19,7 +19,7 @@ import (
 )
 
 func rebalancePartitions(
-	prevMap *PartitionMap,
+	prevMap PartitionMap,
 	nodesToRemove []string,
 	nodesToAdd []string,
 	model *PartitionModel,
@@ -27,32 +27,27 @@ func rebalancePartitions(
 	// "master", "slave", "dead", etc.
 	modelStateConstraints map[string]int,
 	partitionWeights map[string]int,
-) *PartitionMap {
+) PartitionMap {
 	// Start by filling out nextPartitions as a deep clone of
 	// prevMap.Partitions, but filter out the to-be-removed nodes.
-	nextPartitions := make([]*Partition, 0, len(prevMap.Partitions))
-	for _, prevPartition := range prevMap.Partitions {
-		n := removeNodesFromNodesByState(prevPartition.NodesByState, nodesToRemove)
-		nextPartitions = append(nextPartitions, &Partition{
-			Name:         prevPartition.Name,
-			NodesByState: n,
-		})
+	nextPartitions := prevMap.toArrayCopy()
+	for _, partition := range nextPartitions {
+		partition.NodesByState =
+			removeNodesFromNodesByState(partition.NodesByState, nodesToRemove)
 	}
+	sort.Sort(&partitionSorter{a: nextPartitions})
 
 	// Given a PartitionModel state name and its constraints, for
 	// every partition, assign nodes.
 	assignStateToPartitions := func(stateName string, constraints int) {
 		// Sort the partitions to help reach a better assignment.
 		p := &partitionSorter{
-			stateName:         stateName,
-			prevMapPartitions: make(map[string]*Partition),
-			nodesToRemove:     nodesToRemove,
-			nodesToAdd:        nodesToAdd,
-			partitionWeights:  partitionWeights,
-			a:                 append([]*Partition(nil), nextPartitions...),
-		}
-		for _, prevMapPartition := range prevMap.Partitions {
-			p.prevMapPartitions[prevMapPartition.Name] = prevMapPartition
+			stateName:        stateName,
+			prevPartitions:   prevMap,
+			nodesToRemove:    nodesToRemove,
+			nodesToAdd:       nodesToAdd,
+			partitionWeights: partitionWeights,
+			a:                append([]*Partition(nil), nextPartitions...),
 		}
 		sort.Sort(p)
 
@@ -82,7 +77,27 @@ func rebalancePartitions(
 		}
 	}
 
-	return nil
+	return nil // TODO: return a real PartitionMap
+}
+
+// Makes a deep copy of the PartitionMap as an array.
+func (m PartitionMap) toArrayCopy() []*Partition {
+	rv := make([]*Partition, 0, len(m))
+	for _, partition := range m {
+		rv = append(rv, &Partition{
+			Name:         partition.Name,
+			NodesByState: copyNodesByState(partition.NodesByState),
+		})
+	}
+	return rv
+}
+
+func copyNodesByState(nbs map[string][]string) map[string][]string {
+	rv := make(map[string][]string)
+	for stateName, nodes := range nbs {
+		rv[stateName] = append([]string(nil), nodes...)
+	}
+	return rv
 }
 
 // --------------------------------------------------------
@@ -139,11 +154,11 @@ func (pms *stateNameSorter) Swap(i, j int) {
 // partitions-who-haven't-been-assigned-anywhere-yet, then by
 // partition-weight, then by partition-name.
 type partitionSorter struct {
-	stateName         string
-	prevMapPartitions map[string]*Partition // Keyed by partition name.
-	nodesToRemove     []string
-	nodesToAdd        []string
-	partitionWeights  map[string]int // Keyed by partition name.
+	stateName        string                // When "", just sort by partition name.
+	prevPartitions   map[string]*Partition // Keyed by partition name.
+	nodesToRemove    []string
+	nodesToAdd       []string
+	partitionWeights map[string]int // Keyed by partition name.
 
 	a []*Partition // Mutated during sort.
 }
@@ -155,13 +170,11 @@ func (r *partitionSorter) Len() int {
 func (r *partitionSorter) Less(i, j int) bool {
 	ei := r.Entry(i)
 	ej := r.Entry(j)
-
 	for x := 0; x < len(ei) && x < len(ej); x++ {
 		if ei[x] < ej[x] {
 			return true
 		}
 	}
-
 	return len(ei) < len(ej)
 }
 
@@ -182,18 +195,23 @@ func (r *partitionSorter) Entry(i int) []string {
 	partitionWeightStr := fmt.Sprintf("%20d", partitionWeight)
 
 	// First, favor partitions on nodes that are to-be-removed.
-	lastPartition := r.prevMapPartitions[partitionName]
-	lastPartitionNBS := lastPartition.NodesByState[r.stateName]
-	if lastPartitionNBS != nil &&
-		len(StringsIntersectStrings(lastPartitionNBS, r.nodesToRemove)) > 0 {
-		return []string{"0", partitionWeightStr, partitionName}
+	if r.prevPartitions != nil &&
+		r.nodesToRemove != nil {
+		lastPartition := r.prevPartitions[partitionName]
+		lastPartitionNBS := lastPartition.NodesByState[r.stateName]
+		if lastPartitionNBS != nil &&
+			len(StringsIntersectStrings(lastPartitionNBS, r.nodesToRemove)) > 0 {
+			return []string{"0", partitionWeightStr, partitionName}
+		}
 	}
 
 	// Then, favor partitions who haven't yet been assigned to any
 	// newly added nodes yet for any state.
-	fnbs := flattenNodesByState(r.a[i].NodesByState)
-	if len(StringsIntersectStrings(fnbs, r.nodesToAdd)) <= 0 {
-		return []string{"1", partitionWeightStr, partitionName}
+	if r.nodesToAdd != nil {
+		fnbs := flattenNodesByState(r.a[i].NodesByState)
+		if len(StringsIntersectStrings(fnbs, r.nodesToAdd)) <= 0 {
+			return []string{"1", partitionWeightStr, partitionName}
+		}
 	}
 
 	return []string{"2", partitionWeightStr, partitionName}

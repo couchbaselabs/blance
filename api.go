@@ -13,10 +13,16 @@
 // using a greedy, single-pass, heuristic, functional approach.
 package blance
 
-type PartitionMap struct {
-	Partitions map[string]*Partition // Keyed by Partition.Name.
-}
+// A PartitionMap represents all the partitions for some logical
+// resource, where the partitions are assigned to different nodes and
+// with different states.  For example, partition "A...H" is assigned
+// to node "x" as a "master" and to node "y" as a "replica".  And,
+// partition "I...Z" is assigned node "y" as a "master" and to node
+// "z" as a "replica".
+type PartitionMap map[string]*Partition // Keyed by Partition.Name.
 
+// A Partition represents a distinct subset (or a shard) of some
+// logical resource.
 type Partition struct {
 	// Name must be unique within a PartitionMap.Partitions.
 	Name string
@@ -44,14 +50,15 @@ type PartitionModelState struct {
 }
 
 func RebalancePartitions(
-	prevMap *PartitionMap,
+	prevMap PartitionMap,
 	nodesToRemove []string,
 	nodesToAdd []string,
 	model *PartitionModel,
 	// Keyed by same key as the key to partitionModel.States, e.g.,
 	// "master", "slave", "dead", etc.
 	modelStateConstraints map[string]int,
-	partitionWeights map[string]int) *PartitionMap {
+	partitionWeights map[string]int,
+) PartitionMap {
 	return rebalancePartitions(prevMap, nodesToRemove, nodesToAdd,
 		model, modelStateConstraints, partitionWeights)
 }
