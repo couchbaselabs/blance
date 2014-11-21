@@ -1,6 +1,7 @@
 package blance
 
 import (
+	"encoding/json"
 	"reflect"
 	"sort"
 	"testing"
@@ -271,6 +272,89 @@ func TestPartitionMapToArrayCopy(t *testing.T) {
 		if !reflect.DeepEqual(r, c.exp) {
 			t.Errorf("i: %d, m: %#v, r: %#v, exp: %#v",
 				i, c.m, r, c.exp)
+		}
+	}
+}
+
+
+func TestPlanNextMap(t *testing.T) {
+	tests := []struct {
+		PrevMap PartitionMap
+		Nodes []string
+		NodesToRemove []string
+		NodesToAdd []string
+		Model PartitionModel
+		ModelStateConstraints map[string]int
+		PartitionWeights map[string]int
+		StateStickiness map[string]int
+		NodeWeights map[string]int
+		exp PartitionMap
+		expNumWarnings int
+	}{
+		{
+			PrevMap: PartitionMap{
+				"0": &Partition{
+					Name: "0",
+					NodesByState: map[string][]string{},
+				},
+				"1": &Partition{
+					Name: "1",
+					NodesByState: map[string][]string{},
+				},
+			},
+			Nodes: []string{"a"},
+			NodesToRemove: []string{},
+			NodesToAdd: []string{"a"},
+			Model: 			PartitionModel{
+				"master": &PartitionModelState{
+					Priority: 0, Constraints: 0,
+				},
+				"slave":  &PartitionModelState{
+					Priority: 1, Constraints: 0,
+				},
+			},
+			ModelStateConstraints: nil,
+			PartitionWeights: nil,
+			StateStickiness: nil,
+			NodeWeights: nil,
+			exp: PartitionMap{
+				"0": &Partition{
+					Name: "0",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+					},
+				},
+				"1": &Partition{
+					Name: "1",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+					},
+				},
+			},
+			expNumWarnings: 0,
+		},
+	}
+	for i, c := range tests {
+		rMap, rWarnings := planNextMap(
+			c.PrevMap,
+			c.Nodes,
+			c.NodesToRemove,
+			c.NodesToAdd,
+			c.Model,
+			c.ModelStateConstraints,
+			c.PartitionWeights,
+			c.StateStickiness,
+			c.NodeWeights)
+		if !reflect.DeepEqual(rMap, c.exp) {
+			jc, _ := json.Marshal(c)
+			jrMap, _ := json.Marshal(rMap)
+			jexp, _ := json.Marshal(c.exp)
+			t.Errorf("i: %d, planNextMap, c: %s, rMap: %s, exp: %s",
+				i, jc, jrMap, jexp)
+		}
+		if c.expNumWarnings != len(rWarnings) {
+			t.Errorf("i: %d, planNextMap.warnings, c: %#v, rWarnings: %d, expNumWarnings: %d",
+				i, c, rWarnings, c.expNumWarnings)
 		}
 	}
 }

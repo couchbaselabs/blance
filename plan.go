@@ -113,7 +113,7 @@ func planNextMap(
 		// TODO: factor in cluster hierarchy.
 
 		if len(candidateNodes) > constraints {
-			candidateNodes = candidateNodes[0:constraints]
+			candidateNodes = candidateNodes[0:constraints+1]
 		} else {
 			warnings = append(warnings,
 				fmt.Sprintf("count not meed contraints: %d,"+
@@ -206,7 +206,7 @@ func planNextMap(
 				constraints = modelState.Constraints
 			}
 		}
-		if constraints > 0 {
+		if constraints >= 0 {
 			assignStateToPartitions(stateName, constraints)
 		}
 	}
