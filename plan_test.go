@@ -393,6 +393,29 @@ func TestPlanNextMap(t *testing.T) {
 			},
 			expNumWarnings: 2,
 		},
+		{
+			About:   "no partitions case",
+			PrevMap: PartitionMap{
+			},
+			Nodes:         []string{"a"},
+			NodesToRemove: []string{},
+			NodesToAdd:    []string{"a"},
+			Model: PartitionModel{
+				"master": &PartitionModelState{
+					Priority: 0, Constraints: 1,
+				},
+				"slave": &PartitionModelState{
+					Priority: 1, Constraints: 1,
+				},
+			},
+			ModelStateConstraints: nil,
+			PartitionWeights:      nil,
+			StateStickiness:       nil,
+			NodeWeights:           nil,
+			exp: PartitionMap{
+			},
+			expNumWarnings: 0,
+		},
 	}
 	for i, c := range tests {
 		rMap, rWarnings := planNextMap(
