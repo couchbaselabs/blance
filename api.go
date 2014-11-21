@@ -54,20 +54,18 @@ type PartitionModelState struct {
 	Constraints int
 }
 
-// RebalancePartitions is the main entry point.
-func RebalancePartitions(
+// PlanNextMap is the main entry point.
+func PlanNextMap(
 	prevMap PartitionMap,
-	nodes []string,
+	nodes []string, // Union of nodesToRemove, nodesToAdd and non-changing nodes.
 	nodesToRemove []string,
 	nodesToAdd []string,
 	model PartitionModel,
-	// Keyed by same key as the key to partitionModel.States, e.g.,
-	// "master", "slave", "dead", etc.
 	modelStateConstraints map[string]int, // Keyed by stateName.
 	partitionWeights map[string]int, // Keyed by partitionName.
 	stateStickiness map[string]int, // Keyed by stateName.
 	nodeWeights map[string]int, // Keyed by node.
 ) (nextMap PartitionMap, warnings []string) {
-	return rebalancePartitions(prevMap, nodes, nodesToRemove, nodesToAdd,
+	return planNextMap(prevMap, nodes, nodesToRemove, nodesToAdd,
 		model, modelStateConstraints, partitionWeights, stateStickiness, nodeWeights)
 }

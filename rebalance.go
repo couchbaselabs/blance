@@ -19,7 +19,7 @@ import (
 	"strconv"
 )
 
-func rebalancePartitions(
+func planNextMap(
 	prevMap PartitionMap,
 	nodes []string,
 	nodesToRemove []string,
