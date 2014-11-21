@@ -10,7 +10,7 @@
 //  governing permissions and limitations under the License.
 
 // The blance package provides a partition rebalancing algorithm,
-// using a greedy, single-pass, heuristic, functional approach.
+// using a greedy, constant-pass, heuristic, functional approach.
 package blance
 
 // A PartitionMap represents all the partitions for some logical
@@ -34,8 +34,8 @@ type Partition struct {
 }
 
 // A PartitionModel lets applications define different states for each
-// partition per node, such as "master", "slave", "dead", etc.
-// It is keyed by stateName, like "master", "slave", "dead", etc.
+// partition per node, such as "master", "slave", "dead", etc.  Key is
+// stateName, like "master", "slave", "dead", etc.
 type PartitionModel map[string]*PartitionModelState
 
 // A PartitionModelState lets applications define metadata per
@@ -57,14 +57,17 @@ type PartitionModelState struct {
 // RebalancePartitions is the main entry point.
 func RebalancePartitions(
 	prevMap PartitionMap,
+	nodes []string,
 	nodesToRemove []string,
 	nodesToAdd []string,
 	model PartitionModel,
 	// Keyed by same key as the key to partitionModel.States, e.g.,
 	// "master", "slave", "dead", etc.
-	modelStateConstraints map[string]int,
-	partitionWeights map[string]int,
-) PartitionMap {
-	return rebalancePartitions(prevMap, nodesToRemove, nodesToAdd,
-		model, modelStateConstraints, partitionWeights)
+	modelStateConstraints map[string]int, // Keyed by stateName.
+	partitionWeights map[string]int, // Keyed by partitionName.
+	stateStickiness map[string]int, // Keyed by stateName.
+	nodeWeights map[string]int, // Keyed by node.
+) (nextMap PartitionMap, warnings []string) {
+	return rebalancePartitions(prevMap, nodes, nodesToRemove, nodesToAdd,
+		model, modelStateConstraints, partitionWeights, stateStickiness, nodeWeights)
 }
