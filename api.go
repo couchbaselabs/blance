@@ -9,8 +9,8 @@
 //  express or implied. See the License for the specific language
 //  governing permissions and limitations under the License.
 
-// The blance package provides a partition rebalancing algorithm,
-// using a greedy, constant-pass, heuristic, functional approach.
+// Package blance provides a partition assignment library, using a
+// greedy, constant-pass, heuristic, functional approach.
 package blance
 
 // A PartitionMap represents all the partitions for some logical

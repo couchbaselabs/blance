@@ -194,7 +194,7 @@ func planNextMap(
 		m: model,
 		s: make([]string, 0, len(model)),
 	}
-	for stateName, _ := range model {
+	for stateName := range model {
 		pms.s = append(pms.s, stateName)
 	}
 	sort.Sort(pms)
