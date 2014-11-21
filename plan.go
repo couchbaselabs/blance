@@ -318,7 +318,7 @@ func flattenNodesByState(nodesByState map[string][]string) []string {
 // Does ORDER BY m.States[stateName].Priority ASC, stateName ASC".
 type stateNameSorter struct {
 	m PartitionModel
-	s []string // Mutated array of partition model state names.
+	s []string // This array is mutated during a sort.Sort()
 }
 
 func (pms *stateNameSorter) Len() int {
@@ -354,7 +354,7 @@ type partitionSorter struct {
 	nodesToAdd       []string
 	partitionWeights map[string]int // Keyed by partition name.
 
-	a []*Partition // Mutated during sort.
+	a []*Partition // This array is mutated during sort.Sort().
 }
 
 func (r *partitionSorter) Len() int {
