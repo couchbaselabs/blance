@@ -22,9 +22,9 @@ func TestStringsToMap(t *testing.T) {
 }
 
 func TestStringsRemoveStrings(t *testing.T) {
-	tests := []struct{
-		a []string
-		b []string
+	tests := []struct {
+		a   []string
+		b   []string
 		exp []string
 	}{
 		{[]string{}, []string{}, []string{}},
@@ -50,9 +50,9 @@ func TestStringsRemoveStrings(t *testing.T) {
 }
 
 func TestStringsIntersectStrings(t *testing.T) {
-	tests := []struct{
-		a []string
-		b []string
+	tests := []struct {
+		a   []string
+		b   []string
 		exp []string
 	}{
 		{[]string{}, []string{}, []string{}},
