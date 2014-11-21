@@ -292,6 +292,7 @@ func TestPartitionMapToArrayCopy(t *testing.T) {
 
 func TestPlanNextMap(t *testing.T) {
 	tests := []struct {
+		About                 string
 		PrevMap               PartitionMap
 		Nodes                 []string
 		NodesToRemove         []string
@@ -305,6 +306,7 @@ func TestPlanNextMap(t *testing.T) {
 		expNumWarnings        int
 	}{
 		{
+			About:   "single node, simple assignment of master",
 			PrevMap: PartitionMap{
 				"0": &Partition{
 					Name:         "0",
@@ -345,6 +347,51 @@ func TestPlanNextMap(t *testing.T) {
 				},
 			},
 			expNumWarnings: 0,
+		},
+		{
+			About:   "single node, not enough to assign slaves",
+			PrevMap: PartitionMap{
+				"0": &Partition{
+					Name:         "0",
+					NodesByState: map[string][]string{},
+				},
+				"1": &Partition{
+					Name:         "1",
+					NodesByState: map[string][]string{},
+				},
+			},
+			Nodes:         []string{"a"},
+			NodesToRemove: []string{},
+			NodesToAdd:    []string{"a"},
+			Model: PartitionModel{
+				"master": &PartitionModelState{
+					Priority: 0, Constraints: 1,
+				},
+				"slave": &PartitionModelState{
+					Priority: 1, Constraints: 1,
+				},
+			},
+			ModelStateConstraints: nil,
+			PartitionWeights:      nil,
+			StateStickiness:       nil,
+			NodeWeights:           nil,
+			exp: PartitionMap{
+				"0": &Partition{
+					Name: "0",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+						"slave":  []string{},
+					},
+				},
+				"1": &Partition{
+					Name: "1",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+						"slave":  []string{},
+					},
+				},
+			},
+			expNumWarnings: 2,
 		},
 	}
 	for i, c := range tests {
