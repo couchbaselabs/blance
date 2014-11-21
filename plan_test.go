@@ -418,7 +418,7 @@ func TestPlanNextMap(t *testing.T) {
 		},
 	}
 	for i, c := range tests {
-		rMap, rWarnings := planNextMap(
+		r, rWarnings := planNextMap(
 			c.PrevMap,
 			c.Nodes,
 			c.NodesToRemove,
@@ -428,12 +428,12 @@ func TestPlanNextMap(t *testing.T) {
 			c.PartitionWeights,
 			c.StateStickiness,
 			c.NodeWeights)
-		if !reflect.DeepEqual(rMap, c.exp) {
+		if !reflect.DeepEqual(r, c.exp) {
 			jc, _ := json.Marshal(c)
-			jrMap, _ := json.Marshal(rMap)
+			jr, _ := json.Marshal(r)
 			jexp, _ := json.Marshal(c.exp)
-			t.Errorf("i: %d, planNextMap, c: %s, rMap: %s, exp: %s",
-				i, jc, jrMap, jexp)
+			t.Errorf("i: %d, planNextMap, c: %s, [RESULT] r: %s, [EXPECTED] exp: %s",
+				i, jc, jr, jexp)
 		}
 		if c.expNumWarnings != len(rWarnings) {
 			t.Errorf("i: %d, planNextMap.warnings, c: %#v, rWarnings: %d, expNumWarnings: %d",
