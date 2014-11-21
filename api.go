@@ -66,6 +66,10 @@ func PlanNextMap(
 	stateStickiness map[string]int, // Keyed by stateName.
 	nodeWeights map[string]int, // Keyed by node.
 ) (nextMap PartitionMap, warnings []string) {
-	return planNextMap(prevMap, nodes, nodesToRemove, nodesToAdd,
-		model, modelStateConstraints, partitionWeights, stateStickiness, nodeWeights)
+	return planNextMap(prevMap,
+		nodes, nodesToRemove, nodesToAdd,
+		model, modelStateConstraints,
+		partitionWeights,
+		stateStickiness,
+		nodeWeights)
 }
