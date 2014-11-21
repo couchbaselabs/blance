@@ -328,7 +328,14 @@ func (pms *stateNameSorter) Len() int {
 func (pms *stateNameSorter) Less(i, j int) bool {
 	iname, jname := pms.s[i], pms.s[j]
 
-	return pms.m[iname].Priority < pms.m[jname].Priority || iname < jname
+	if pms.m != nil &&
+		pms.m[iname] != nil &&
+		pms.m[jname] != nil &&
+		pms.m[iname].Priority < pms.m[jname].Priority {
+		return true
+	}
+
+	return iname < jname
 }
 
 func (pms *stateNameSorter) Swap(i, j int) {

@@ -2,6 +2,7 @@ package blance
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -97,6 +98,70 @@ func TestRemoveNodesFromNodesByState(t *testing.T) {
 		if !reflect.DeepEqual(r, c.exp) {
 			t.Errorf("i: %d, nodesByState: %#v, removeNodes: %#v, exp: %#v, got: %#v",
 				i, c.nodesByState, c.removeNodes, c.exp, r)
+		}
+	}
+}
+
+func TestStateNameSorter(t *testing.T) {
+	tests := []struct {
+		m   PartitionModel
+		s   []string
+		exp []string
+	}{
+		{
+			PartitionModel{
+				"master": &PartitionModelState{Priority: 0},
+				"slave":  &PartitionModelState{Priority: 1},
+			},
+			[]string{},
+			[]string{},
+		},
+		{
+			PartitionModel{
+				"master": &PartitionModelState{Priority: 0},
+				"slave":  &PartitionModelState{Priority: 1},
+			},
+			[]string{"master", "slave"},
+			[]string{"master", "slave"},
+		},
+		{
+			PartitionModel{
+				"master": &PartitionModelState{Priority: 0},
+				"slave":  &PartitionModelState{Priority: 1},
+			},
+			[]string{"slave", "master"},
+			[]string{"master", "slave"},
+		},
+		{
+			PartitionModel{
+				"master": &PartitionModelState{Priority: 0},
+				"slave":  &PartitionModelState{Priority: 1},
+			},
+			[]string{"a", "b"},
+			[]string{"a", "b"},
+		},
+		{
+			PartitionModel{
+				"master": &PartitionModelState{Priority: 0},
+				"slave":  &PartitionModelState{Priority: 1},
+			},
+			[]string{"a", "master"},
+			[]string{"a", "master"},
+		},
+		{
+			PartitionModel{
+				"master": &PartitionModelState{Priority: 0},
+				"slave":  &PartitionModelState{Priority: 1},
+			},
+			[]string{"master", "a"},
+			[]string{"a", "master"},
+		},
+	}
+	for i, c := range tests {
+		sort.Sort(&stateNameSorter{m: c.m, s: c.s})
+		if !reflect.DeepEqual(c.s, c.exp) {
+			t.Errorf("i: %d, m: %#v, s: %#v, exp: %#v",
+				i, c.m, c.s, c.exp)
 		}
 	}
 }
