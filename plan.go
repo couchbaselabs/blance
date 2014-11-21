@@ -30,6 +30,8 @@ func planNextMap(
 ) (PartitionMap, []string) {
 	warnings := []string{}
 
+	nodesNext := StringsRemoveStrings(nodes, nodesToRemove)
+
 	// Start by filling out nextPartitions as a deep clone of
 	// prevMap.Partitions, but filter out the to-be-removed nodes.
 	nextPartitions := prevMap.toArrayCopy()
@@ -89,7 +91,7 @@ func planNextMap(
 
 		statePriority := model[stateName].Priority
 
-		candidateNodes := append([]string(nil), nodes...)
+		candidateNodes := append([]string(nil), nodesNext...)
 
 		// Filter out nodes of a higher priority state; e.g., if we're
 		// assigning slaves, leave the masters untouched.
