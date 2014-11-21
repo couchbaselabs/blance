@@ -233,24 +233,36 @@ func TestPartitionMapToArrayCopy(t *testing.T) {
 	}{
 		{
 			PartitionMap{
-				"0": &Partition{NodesByState: map[string][]string{
-					"master": []string{"a"},
-					"slave":  []string{"b", "c"},
-				}},
-				"1": &Partition{NodesByState: map[string][]string{
-					"master": []string{"b"},
-					"slave":  []string{"c"},
-				}},
+				"0": &Partition{
+					Name: "0",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+						"slave":  []string{"b", "c"},
+					},
+				},
+				"1": &Partition{
+					Name: "1",
+					NodesByState: map[string][]string{
+						"master": []string{"b"},
+						"slave":  []string{"c"},
+					},
+				},
 			},
 			[]*Partition{
-				&Partition{NodesByState: map[string][]string{
-					"master": []string{"a"},
-					"slave":  []string{"b", "c"},
-				}},
-				&Partition{NodesByState: map[string][]string{
-					"master": []string{"b"},
-					"slave":  []string{"c"},
-				}},
+				&Partition{
+					Name: "0",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+						"slave":  []string{"b", "c"},
+					},
+				},
+				&Partition{
+					Name: "1",
+					NodesByState: map[string][]string{
+						"master": []string{"b"},
+						"slave":  []string{"c"},
+					},
+				},
 			},
 		},
 	}
