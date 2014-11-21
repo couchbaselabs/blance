@@ -498,7 +498,7 @@ func TestPlanNextMap(t *testing.T) {
 		},
 	}
 	for i, c := range tests {
-		r, rWarnings := planNextMap(
+		r, rWarnings := PlanNextMap(
 			c.PrevMap,
 			c.Nodes,
 			c.NodesToRemove,
