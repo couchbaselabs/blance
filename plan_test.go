@@ -320,7 +320,7 @@ func TestPlanNextMap(t *testing.T) {
 			NodesToAdd:    []string{"a"},
 			Model: PartitionModel{
 				"master": &PartitionModelState{
-					Priority: 0, Constraints: 0,
+					Priority: 0, Constraints: 1,
 				},
 				"slave": &PartitionModelState{
 					Priority: 1, Constraints: 0,

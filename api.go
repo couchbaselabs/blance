@@ -50,7 +50,8 @@ type PartitionModelState struct {
 	// A Constraint defines how many nodes the rebalancing algorithm
 	// strives to assign a partition.  For example, for any given
 	// partition, perhaps the application wants a 1 node to have
-	// "master" state and wants 2 nodes to have "slave" state.
+	// "master" state and wants 2 nodes to have "slave" state.  So
+	// "master" has Contraints of 1, and "slave" has Constraints of 2.
 	Constraints int
 }
 

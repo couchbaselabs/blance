@@ -46,7 +46,9 @@ func planNextMap(
 
 	// Helper function that returns an ordered array of candidates
 	// nodes to assign to a partition, ordered by best heuristic fit.
-	findBestNodes := func(partition *Partition, stateName string,
+	findBestNodes := func(
+		partition *Partition,
+		stateName string,
 		constraints int,
 		nodeToNodeCounts map[string]map[string]int,
 	) []string {
@@ -92,7 +94,7 @@ func planNextMap(
 		// Filter out nodes of a higher priority state; e.g., if we're
 		// assigning slaves, leave the masters untouched.
 		for stateName, stateNodes := range partition.NodesByState {
-			if model[stateName].Priority > statePriority {
+			if model[stateName].Priority < statePriority {
 				candidateNodes = StringsRemoveStrings(candidateNodes, stateNodes)
 			}
 		}
@@ -112,11 +114,11 @@ func planNextMap(
 
 		// TODO: factor in cluster hierarchy.
 
-		if len(candidateNodes) > constraints {
-			candidateNodes = candidateNodes[0 : constraints+1]
+		if len(candidateNodes) >= constraints {
+			candidateNodes = candidateNodes[0:constraints]
 		} else {
 			warnings = append(warnings,
-				fmt.Sprintf("count not meed contraints: %d,"+
+				fmt.Sprintf("could not meet contraints: %d,"+
 					" stateName: %s, partitionName: %s",
 					constraints, stateName, partition.Name))
 		}
@@ -208,7 +210,7 @@ func planNextMap(
 			}
 		}
 
-		if constraints >= 0 {
+		if constraints > 0 {
 			assignStateToPartitions(stateName, constraints)
 		}
 	}
