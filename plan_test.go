@@ -198,7 +198,7 @@ func TestCountStateNodes(t *testing.T) {
 		{
 			PartitionMap{
 				"0": &Partition{NodesByState: map[string][]string{
-					"slave":  []string{"b", "c"},
+					"slave": []string{"b", "c"},
 				}},
 				"1": &Partition{NodesByState: map[string][]string{
 					"master": []string{"b"},
@@ -222,6 +222,43 @@ func TestCountStateNodes(t *testing.T) {
 		if !reflect.DeepEqual(r, c.exp) {
 			t.Errorf("i: %d, m: %#v, w: %#v, exp: %#v",
 				i, c.m, c.w, c.exp)
+		}
+	}
+}
+
+func TestPartitionMapToArrayCopy(t *testing.T) {
+	tests := []struct {
+		m   PartitionMap
+		exp []*Partition
+	}{
+		{
+			PartitionMap{
+				"0": &Partition{NodesByState: map[string][]string{
+					"master": []string{"a"},
+					"slave":  []string{"b", "c"},
+				}},
+				"1": &Partition{NodesByState: map[string][]string{
+					"master": []string{"b"},
+					"slave":  []string{"c"},
+				}},
+			},
+			[]*Partition{
+				&Partition{NodesByState: map[string][]string{
+					"master": []string{"a"},
+					"slave":  []string{"b", "c"},
+				}},
+				&Partition{NodesByState: map[string][]string{
+					"master": []string{"b"},
+					"slave":  []string{"c"},
+				}},
+			},
+		},
+	}
+	for i, c := range tests {
+		r := c.m.toArrayCopy()
+		if !reflect.DeepEqual(r, c.exp) {
+			t.Errorf("i: %d, m: %#v, r: %#v, exp: %#v",
+				i, c.m, r, c.exp)
 		}
 	}
 }
