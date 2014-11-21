@@ -9,8 +9,6 @@
 //  express or implied. See the License for the specific language
 //  governing permissions and limitations under the License.
 
-// The blance package provides a partition rebalancing algorithm,
-// using a greedy, single-pass, heuristic approach.
 package blance
 
 import (
