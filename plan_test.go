@@ -165,3 +165,63 @@ func TestStateNameSorter(t *testing.T) {
 		}
 	}
 }
+
+func TestCountStateNodes(t *testing.T) {
+	tests := []struct {
+		m   PartitionMap
+		w   map[string]int
+		exp map[string]map[string]int
+	}{
+		{
+			PartitionMap{
+				"0": &Partition{NodesByState: map[string][]string{
+					"master": []string{"a"},
+					"slave":  []string{"b", "c"},
+				}},
+				"1": &Partition{NodesByState: map[string][]string{
+					"master": []string{"b"},
+					"slave":  []string{"c"},
+				}},
+			},
+			nil,
+			map[string]map[string]int{
+				"master": map[string]int{
+					"a": 1,
+					"b": 1,
+				},
+				"slave": map[string]int{
+					"b": 1,
+					"c": 2,
+				},
+			},
+		},
+		{
+			PartitionMap{
+				"0": &Partition{NodesByState: map[string][]string{
+					"slave":  []string{"b", "c"},
+				}},
+				"1": &Partition{NodesByState: map[string][]string{
+					"master": []string{"b"},
+					"slave":  []string{"c"},
+				}},
+			},
+			nil,
+			map[string]map[string]int{
+				"master": map[string]int{
+					"b": 1,
+				},
+				"slave": map[string]int{
+					"b": 1,
+					"c": 2,
+				},
+			},
+		},
+	}
+	for i, c := range tests {
+		r := countStateNodes(c.m, c.w)
+		if !reflect.DeepEqual(r, c.exp) {
+			t.Errorf("i: %d, m: %#v, w: %#v, exp: %#v",
+				i, c.m, c.w, c.exp)
+		}
+	}
+}

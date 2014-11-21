@@ -256,8 +256,10 @@ func adjustStateNodeCounts(stateNodeCounts map[string]map[string]int,
 // then return value will be...
 //   { "master": { "a": 1, "b": 1 },
 //     "slave": { "b": 1, "c": 2 } }
-func countStateNodes(partitionMap PartitionMap,
-	partitionWeights map[string]int) map[string]map[string]int {
+func countStateNodes(
+	partitionMap PartitionMap,
+	partitionWeights map[string]int,
+) map[string]map[string]int {
 	rv := make(map[string]map[string]int)
 	for partitionName, partition := range partitionMap {
 		for stateName, nodes := range partition.NodesByState {
