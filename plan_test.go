@@ -267,12 +267,26 @@ func TestPartitionMapToArrayCopy(t *testing.T) {
 			},
 		},
 	}
-	for i, c := range tests {
+	for _, c := range tests {
 		r := c.m.toArrayCopy()
-		if !reflect.DeepEqual(r, c.exp) {
-			t.Errorf("i: %d, m: %#v, r: %#v, exp: %#v",
-				i, c.m, r, c.exp)
+		testSubset := func(a, b []*Partition) {
+			if len(a) != len(b) {
+				t.Errorf("expected same lengths")
+			}
+			for _, ap := range a {
+				found := false
+				for _, bp := range b {
+					if reflect.DeepEqual(ap, bp) {
+						found = true
+					}
+				}
+				if !found {
+					t.Errorf("couldn't find a entry in b")
+				}
+			}
 		}
+		testSubset(r, c.exp)
+		testSubset(c.exp, r)
 	}
 }
 
