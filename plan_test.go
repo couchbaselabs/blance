@@ -306,7 +306,7 @@ func TestPlanNextMap(t *testing.T) {
 		expNumWarnings        int
 	}{
 		{
-			About:   "single node, simple assignment of master",
+			About: "single node, simple assignment of master",
 			PrevMap: PartitionMap{
 				"0": &Partition{
 					Name:         "0",
@@ -349,7 +349,7 @@ func TestPlanNextMap(t *testing.T) {
 			expNumWarnings: 0,
 		},
 		{
-			About:   "single node, not enough to assign slaves",
+			About: "single node, not enough to assign slaves",
 			PrevMap: PartitionMap{
 				"0": &Partition{
 					Name:         "0",
@@ -394,9 +394,8 @@ func TestPlanNextMap(t *testing.T) {
 			expNumWarnings: 2,
 		},
 		{
-			About:   "no partitions case",
-			PrevMap: PartitionMap{
-			},
+			About:         "no partitions case",
+			PrevMap:       PartitionMap{},
 			Nodes:         []string{"a"},
 			NodesToRemove: []string{},
 			NodesToAdd:    []string{"a"},
@@ -412,12 +411,11 @@ func TestPlanNextMap(t *testing.T) {
 			PartitionWeights:      nil,
 			StateStickiness:       nil,
 			NodeWeights:           nil,
-			exp: PartitionMap{
-			},
-			expNumWarnings: 0,
+			exp:                   PartitionMap{},
+			expNumWarnings:        0,
 		},
 		{
-			About:   "no model states case",
+			About: "no model states case",
 			PrevMap: PartitionMap{
 				"0": &Partition{
 					Name:         "0",
@@ -431,28 +429,25 @@ func TestPlanNextMap(t *testing.T) {
 			Nodes:         []string{"a"},
 			NodesToRemove: []string{},
 			NodesToAdd:    []string{"a"},
-			Model: PartitionModel{
-			},
+			Model:         PartitionModel{},
 			ModelStateConstraints: nil,
 			PartitionWeights:      nil,
 			StateStickiness:       nil,
 			NodeWeights:           nil,
 			exp: PartitionMap{
 				"0": &Partition{
-					Name: "0",
-					NodesByState: map[string][]string{
-					},
+					Name:         "0",
+					NodesByState: map[string][]string{},
 				},
 				"1": &Partition{
-					Name: "1",
-					NodesByState: map[string][]string{
-					},
+					Name:         "1",
+					NodesByState: map[string][]string{},
 				},
 			},
 			expNumWarnings: 0,
 		},
 		{
-			About:   "2 nodes, enough for clean master & slave",
+			About: "2 nodes, enough for clean master & slave",
 			PrevMap: PartitionMap{
 				"0": &Partition{
 					Name:         "0",
