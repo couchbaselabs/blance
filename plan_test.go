@@ -276,47 +276,46 @@ func TestPartitionMapToArrayCopy(t *testing.T) {
 	}
 }
 
-
 func TestPlanNextMap(t *testing.T) {
 	tests := []struct {
-		PrevMap PartitionMap
-		Nodes []string
-		NodesToRemove []string
-		NodesToAdd []string
-		Model PartitionModel
+		PrevMap               PartitionMap
+		Nodes                 []string
+		NodesToRemove         []string
+		NodesToAdd            []string
+		Model                 PartitionModel
 		ModelStateConstraints map[string]int
-		PartitionWeights map[string]int
-		StateStickiness map[string]int
-		NodeWeights map[string]int
-		exp PartitionMap
-		expNumWarnings int
+		PartitionWeights      map[string]int
+		StateStickiness       map[string]int
+		NodeWeights           map[string]int
+		exp                   PartitionMap
+		expNumWarnings        int
 	}{
 		{
 			PrevMap: PartitionMap{
 				"0": &Partition{
-					Name: "0",
+					Name:         "0",
 					NodesByState: map[string][]string{},
 				},
 				"1": &Partition{
-					Name: "1",
+					Name:         "1",
 					NodesByState: map[string][]string{},
 				},
 			},
-			Nodes: []string{"a"},
+			Nodes:         []string{"a"},
 			NodesToRemove: []string{},
-			NodesToAdd: []string{"a"},
-			Model: 			PartitionModel{
+			NodesToAdd:    []string{"a"},
+			Model: PartitionModel{
 				"master": &PartitionModelState{
 					Priority: 0, Constraints: 0,
 				},
-				"slave":  &PartitionModelState{
+				"slave": &PartitionModelState{
 					Priority: 1, Constraints: 0,
 				},
 			},
 			ModelStateConstraints: nil,
-			PartitionWeights: nil,
-			StateStickiness: nil,
-			NodeWeights: nil,
+			PartitionWeights:      nil,
+			StateStickiness:       nil,
+			NodeWeights:           nil,
 			exp: PartitionMap{
 				"0": &Partition{
 					Name: "0",

@@ -113,7 +113,7 @@ func planNextMap(
 		// TODO: factor in cluster hierarchy.
 
 		if len(candidateNodes) > constraints {
-			candidateNodes = candidateNodes[0:constraints+1]
+			candidateNodes = candidateNodes[0 : constraints+1]
 		} else {
 			warnings = append(warnings,
 				fmt.Sprintf("count not meed contraints: %d,"+
@@ -131,7 +131,7 @@ func planNextMap(
 			m[candidateNode] = m[candidateNode] + 1
 		}
 
-		return nil // TODO.
+		return candidateNodes
 	}
 
 	// Helper function that given a PartitionModel state name and its
@@ -198,6 +198,7 @@ func planNextMap(
 		pms.s = append(pms.s, stateName)
 	}
 	sort.Sort(pms)
+
 	for _, stateName := range pms.s {
 		constraints, exists := modelStateConstraints[stateName]
 		if !exists {
@@ -206,6 +207,7 @@ func planNextMap(
 				constraints = modelState.Constraints
 			}
 		}
+
 		if constraints >= 0 {
 			assignStateToPartitions(stateName, constraints)
 		}
@@ -263,12 +265,12 @@ func countStateNodes(
 	rv := make(map[string]map[string]int)
 	for partitionName, partition := range partitionMap {
 		for stateName, nodes := range partition.NodesByState {
+			s := rv[stateName]
+			if s == nil {
+				s = make(map[string]int)
+				rv[stateName] = s
+			}
 			for _, node := range nodes {
-				s := rv[stateName]
-				if s == nil {
-					s = make(map[string]int)
-					rv[stateName] = s
-				}
 				partitionWeight := 1
 				if partitionWeights != nil {
 					w, exists := partitionWeights[partitionName]
