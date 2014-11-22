@@ -349,7 +349,7 @@ func TestMapParentsToMapChildren(t *testing.T) {
 			map[string][]string{"r": []string{"a"}}},
 		{map[string]string{"a": "r", "b": "r2"},
 			map[string][]string{
-				"r": []string{"a"},
+				"r":  []string{"a"},
 				"r2": []string{"b"},
 			}},
 		{map[string]string{"a": "r", "a1": "a"},
@@ -1489,6 +1489,22 @@ func TestPlanNextMap(t *testing.T) {
 }
 
 func TestPlanNextMapVis(t *testing.T) {
+	partitionModel1Master0Slave := PartitionModel{
+		"master": &PartitionModelState{
+			Priority: 0, Constraints: 1,
+		},
+		"slave": &PartitionModelState{
+			Priority: 1, Constraints: 0,
+		},
+	}
+	partitionModel1Master1Slave := PartitionModel{
+		"master": &PartitionModelState{
+			Priority: 0, Constraints: 1,
+		},
+		"slave": &PartitionModelState{
+			Priority: 1, Constraints: 1,
+		},
+	}
 	tests := []struct {
 		About                 string
 		FromTo                [][]string
@@ -1505,32 +1521,61 @@ func TestPlanNextMapVis(t *testing.T) {
 		expNumWarnings        int
 	}{
 		{
-			About:  "single node, simple assignment of master",
+			About: "single node, simple assignment of master",
 			FromTo: [][]string{
 				[]string{"", "m"},
 				[]string{"", "m"},
 			},
-			Nodes:         []string{"a"},
-			NodesToRemove: []string{},
-			NodesToAdd:    []string{"a"},
-			Model: PartitionModel{
-				"master": &PartitionModelState{
-					Priority: 0, Constraints: 1,
-				},
-				"slave": &PartitionModelState{
-					Priority: 1, Constraints: 0,
-				},
+			Nodes:          []string{"a"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"a"},
+			Model:          partitionModel1Master0Slave,
+			expNumWarnings: 0,
+		},
+		{
+			About: "added nodes a & b",
+			FromTo: [][]string{
+				[]string{"", "ms"},
+				[]string{"", "sm"},
 			},
+			Nodes:          []string{"a", "b"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"a", "b"},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
+		{
+			About: "single node to 2 nodes",
+			FromTo: [][]string{
+				[]string{"m", "sm"},
+				[]string{"m", "ms"},
+			},
+			Nodes:          []string{"a", "b"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"b"},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
+		{
+			About: "single node to 3 nodes",
+			FromTo: [][]string{
+				[]string{"m", "sm "},
+				[]string{"m", "m s"},
+			},
+			Nodes:          []string{"a", "b", "c"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"b", "c"},
+			Model:          partitionModel1Master1Slave,
 			expNumWarnings: 0,
 		},
 	}
 	nodeNames := map[int]string{} // Maps 0 to "a", 1 to "b", etc.
 	for i := 0; i < 26; i++ {
-		nodeNames[i] = fmt.Sprintf("%c", i + 97) // Start at ASCII 'a'.
+		nodeNames[i] = fmt.Sprintf("%c", i+97) // Start at ASCII 'a'.
 	}
-	stateNames := map[string]string {
-		"m" : "master",
-		"s" : "slave",
+	stateNames := map[string]string{
+		"m": "master",
+		"s": "slave",
 	}
 	for i, c := range tests {
 		prevMap := PartitionMap{}
@@ -1541,25 +1586,29 @@ func TestPlanNextMapVis(t *testing.T) {
 			to := partitionFromTo[1]
 
 			partition := &Partition{
-				Name: partitionName,
+				Name:         partitionName,
 				NodesByState: map[string][]string{},
 			}
 			prevMap[partitionName] = partition
 			for j := 0; j < len(from); j++ {
 				stateName := stateNames[from[j:j+1]]
-				partition.NodesByState[stateName] =
-					append(partition.NodesByState[stateName], nodeNames[j])
+				if stateName != "" {
+					partition.NodesByState[stateName] =
+						append(partition.NodesByState[stateName], nodeNames[j])
+				}
 			}
 
 			partition = &Partition{
-				Name: partitionName,
+				Name:         partitionName,
 				NodesByState: map[string][]string{},
 			}
 			expMap[partitionName] = partition
 			for j := 0; j < len(to); j++ {
 				stateName := stateNames[to[j:j+1]]
-				partition.NodesByState[stateName] =
-					append(partition.NodesByState[stateName], nodeNames[j])
+				if stateName != "" {
+					partition.NodesByState[stateName] =
+						append(partition.NodesByState[stateName], nodeNames[j])
+				}
 			}
 		}
 		r, rWarnings := PlanNextMap(
@@ -1579,8 +1628,8 @@ func TestPlanNextMapVis(t *testing.T) {
 			jp, _ := json.Marshal(prevMap)
 			jr, _ := json.Marshal(r)
 			jexp, _ := json.Marshal(expMap)
-			t.Errorf("i: %d, planNextMapVis, c: %s,\n"+
-				"   [INPUT] jp: %s,\n   [RESULT] r: %s,\n   [EXPECTED] exp: %s",
+			t.Errorf("i: %d, planNextMapVis, c: %s,"+
+				"\nINPUT jp: %s,\nRESULT r: %s,\nEXPECTED: %s",
 				i, jc, jp, jr, jexp)
 		}
 		if c.expNumWarnings != len(rWarnings) {
