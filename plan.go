@@ -404,7 +404,7 @@ func (r *partitionSorter) Score(i int) []string {
 			partitionWeight = w
 		}
 	}
-	partitionWeightStr := fmt.Sprintf("%10d", 999999999 - partitionWeight)
+	partitionWeightStr := fmt.Sprintf("%10d", 999999999-partitionWeight)
 
 	// First, favor partitions on nodes that are to-be-removed.
 	if r.prevMap != nil &&
