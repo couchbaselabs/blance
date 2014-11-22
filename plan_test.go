@@ -1674,6 +1674,28 @@ func TestPlanNextMapVis(t *testing.T) {
 			expNumWarnings: 0,
 		},
 		{
+			// ISSUE: looks like the masters assigned to b moved
+			// nicely to node e, but b's slaves didn't go to e
+			// cleanly.
+			About: "Single node swap, from node b to node e",
+			FromTo: [][]string{
+				//        abcd    abcde
+				[]string{" m s", "   sm"},
+				[]string{"  ms", "  m s"}, // Non-optimal slave move?
+				[]string{"s  m", "s  m "},
+				[]string{" ms ", "  s m"},
+				[]string{" sm ", "  ms "}, // e didn't take over b's slave?
+				[]string{"s  m", "s  m "},
+				[]string{"ms  ", "m   s"},
+				[]string{"m s ", "m s  "},
+			},
+			Nodes:          []string{"a", "b", "c", "d", "e"},
+			NodesToRemove:  []string{"b"},
+			NodesToAdd:     []string{"e"},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
+		{
 			About: "8 partitions, 1 to 8 nodes",
 			FromTo: [][]string{
 				//             abcdefgh
