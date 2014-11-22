@@ -34,6 +34,8 @@ func planNextMap(
 
 	nodesNext := StringsRemoveStrings(nodes, nodesToRemove)
 
+	hierarchyChildren := mapParentsToMapChildren(nodeHierarchy)
+
 	// Start by filling out nextPartitions as a deep clone of
 	// prevMap.Partitions, but filter out the to-be-removed nodes.
 	nextPartitions := prevMap.toArrayCopy()
@@ -97,11 +99,16 @@ func planNextMap(
 
 		// Filter out nodes of a higher priority state; e.g., if we're
 		// assigning slaves, leave the masters untouched.
-		for stateName, stateNodes := range partition.NodesByState {
-			if model[stateName].Priority < statePriority {
-				candidateNodes = StringsRemoveStrings(candidateNodes, stateNodes)
+		excludeHigherPriorityNodes := func(remainingNodes []string) []string {
+			for stateName, stateNodes := range partition.NodesByState {
+				if model[stateName].Priority < statePriority {
+					remainingNodes = StringsRemoveStrings(remainingNodes, stateNodes)
+				}
 			}
+			return remainingNodes
 		}
+
+		candidateNodes = excludeHigherPriorityNodes(candidateNodes)
 
 		sort.Sort(&nodeSorter{
 			stateName:           stateName,
@@ -116,7 +123,48 @@ func planNextMap(
 			a:                   candidateNodes,
 		})
 
-		// TODO: factor in cluster hierarchy.
+		if hierarchyRules != nil {
+			hierarchyNodes := []string{}
+
+			for _, hierarchyRule := range hierarchyRules[stateName] {
+				h := highestPriorityNode
+				if h == "" && len(hierarchyNodes) > 0 {
+					h = hierarchyNodes[0]
+				}
+
+				hierarchyCandidates := includeExcludeNodes(h,
+					hierarchyRule.IncludeLevel,
+					hierarchyRule.ExcludeLevel,
+					nodeHierarchy, hierarchyChildren)
+				hierarchyCandidates =
+					StringsIntersectStrings(hierarchyCandidates, nodesNext)
+				hierarchyCandidates =
+					excludeHigherPriorityNodes(hierarchyCandidates)
+
+				sort.Sort(&nodeSorter{
+					stateName:           stateName,
+					partition:           partition,
+					numPartitions:       len(prevMap),
+					highestPriorityNode: highestPriorityNode,
+					stateNodeCounts:     stateNodeCounts,
+					nodeToNodeCounts:    nodeToNodeCounts,
+					nodePartitionCounts: nodePartitionCounts,
+					nodeWeights:         nodeWeights,
+					stickiness:          stickiness,
+					a:                   hierarchyCandidates,
+				})
+
+				if len(hierarchyCandidates) > 0 {
+					hierarchyNodes = append(hierarchyNodes,
+						hierarchyCandidates[0])
+				} else if len(candidateNodes) > 0 {
+					hierarchyNodes = append(hierarchyNodes,
+						candidateNodes[0])
+				}
+			}
+
+			candidateNodes = append(hierarchyNodes, candidateNodes...)
+		}
 
 		if len(candidateNodes) >= constraints {
 			candidateNodes = candidateNodes[0:constraints]
@@ -509,4 +557,56 @@ func (ns *nodeSorter) Score(i int) float64 {
 	r = r - currentFactor
 
 	return r
+}
+
+// --------------------------------------------------------
+
+// The mapParents is keyed by node, value is parent node.  Returns a
+// map keeyed by node, value is array of child nodes.
+func mapParentsToMapChildren(mapParents map[string]string) map[string][]string {
+	rv := make(map[string][]string)
+	for child, parent := range mapParents {
+		rv[parent] = append(rv[parent], child)
+	}
+	return rv
+}
+
+// The includeLevel is tree ancestor inclusion level, and excludeLevel
+// is tree ancestor exclusion level.  Example: includeLevel of 2 and
+// excludeLevel of 1 means include nodes with the same grandparent
+// (level 2), but exclude nodes with the same parent (level 1).
+func includeExcludeNodes(node string,
+	includeLevel int,
+	excludeLevel int,
+	mapParents map[string]string,
+	mapChildren map[string][]string) []string {
+	if node == "" {
+		return []string{}
+	}
+	incNodes := findLeaves(findAncestor(node, mapParents, includeLevel), mapChildren)
+	excNodes := findLeaves(findAncestor(node, mapParents, excludeLevel), mapChildren)
+	return StringsRemoveStrings(incNodes, excNodes)
+}
+
+func findAncestor(node string, mapParents map[string]string, level int) string {
+	for level > 0 {
+		node = mapParents[node]
+		level--
+	}
+	return node
+}
+
+func findLeaves(node string, mapChildren map[string][]string) []string {
+	if node == "" {
+		return []string{}
+	}
+	children := mapChildren[node]
+	if children == nil {
+		return []string{node}
+	}
+	rv := []string{}
+	for _, c := range children {
+		rv = append(rv, findLeaves(c, mapChildren)...)
+	}
+	return rv
 }
