@@ -290,6 +290,35 @@ func TestPartitionMapToArrayCopy(t *testing.T) {
 	}
 }
 
+func TestMapParentsToMapChildren(t *testing.T) {
+	tests := []struct {
+		in  map[string]string
+		exp map[string][]string
+	}{
+		{map[string]string{},
+			map[string][]string{}},
+		{map[string]string{"a": "r"},
+			map[string][]string{"r": []string{"a"}}},
+		{map[string]string{"a": "r", "b": "r2"},
+			map[string][]string{
+				"r": []string{"a"},
+				"r2": []string{"b"},
+			}},
+		{map[string]string{"a": "r", "a1": "a"},
+			map[string][]string{
+				"r": []string{"a"},
+				"a": []string{"a1"},
+			}},
+	}
+	for i, c := range tests {
+		r := mapParentsToMapChildren(c.in)
+		if !reflect.DeepEqual(r, c.exp) {
+			t.Errorf("i: %d, in: %#v, RESULT: %#v, EXPECTED: %#v",
+				i, c.in, r, c.exp)
+		}
+	}
+}
+
 func TestPlanNextMap(t *testing.T) {
 	tests := []struct {
 		About                 string
