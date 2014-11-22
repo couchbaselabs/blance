@@ -1873,6 +1873,14 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 		"c": "r1",
 		"d": "r1",
 	}
+	hierarchyRulesSameRack := HierarchyRules{
+		"slave": []*HierarchyRule{
+			&HierarchyRule{
+				IncludeLevel: 1,
+				ExcludeLevel: 0,
+			},
+		},
+	}
 	tests := []VisTestCase{
 		{
 			About: "2 racks, but nil hierarchy rules",
@@ -1893,6 +1901,27 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 			Model:          partitionModel1Master1Slave,
 			NodeHierarchy:  nodeHierarchy2Rack,
 			HierarchyRules: nil,
+			expNumWarnings: 0,
+		},
+		{
+			About: "2 racks, favor same rack",
+			FromTo: [][]string{
+				//            abcd
+				[]string{"", "ms  "},
+				[]string{"", "sm  "},
+				[]string{"", "  ms"},
+				[]string{"", "  sm"},
+				[]string{"", "ms  "},
+				[]string{"", "sm  "},
+				[]string{"", "  ms"},
+				[]string{"", "  sm"},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"a", "b", "c", "d"},
+			Model:          partitionModel1Master1Slave,
+			NodeHierarchy:  nodeHierarchy2Rack,
+			HierarchyRules: hierarchyRulesSameRack,
 			expNumWarnings: 0,
 		},
 	}
