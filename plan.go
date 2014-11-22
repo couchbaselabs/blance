@@ -79,18 +79,18 @@ func planNextMap(
 			}
 		}
 
-		highestPriorityStateName := ""
+		topPriorityStateName := ""
 		for stateName, state := range model {
-			if highestPriorityStateName == "" ||
-				model[highestPriorityStateName].Priority < state.Priority {
-				highestPriorityStateName = stateName
+			if topPriorityStateName == "" ||
+				state.Priority < model[topPriorityStateName].Priority {
+				topPriorityStateName = stateName
 			}
 		}
 
-		highestPriorityNode := ""
-		highestPriorityStateNodes := partition.NodesByState[highestPriorityStateName]
-		if len(highestPriorityStateNodes) > 0 {
-			highestPriorityNode = highestPriorityStateNodes[0]
+		topPriorityNode := ""
+		topPriorityStateNodes := partition.NodesByState[topPriorityStateName]
+		if len(topPriorityStateNodes) > 0 {
+			topPriorityNode = topPriorityStateNodes[0]
 		}
 
 		statePriority := model[stateName].Priority
@@ -114,7 +114,7 @@ func planNextMap(
 			stateName:           stateName,
 			partition:           partition,
 			numPartitions:       len(prevMap),
-			highestPriorityNode: highestPriorityNode,
+			topPriorityNode:     topPriorityNode,
 			stateNodeCounts:     stateNodeCounts,
 			nodeToNodeCounts:    nodeToNodeCounts,
 			nodePartitionCounts: nodePartitionCounts,
@@ -127,7 +127,7 @@ func planNextMap(
 			hierarchyNodes := []string{}
 
 			for _, hierarchyRule := range hierarchyRules[stateName] {
-				h := highestPriorityNode
+				h := topPriorityNode
 				if h == "" && len(hierarchyNodes) > 0 {
 					h = hierarchyNodes[0]
 				}
@@ -145,7 +145,7 @@ func planNextMap(
 					stateName:           stateName,
 					partition:           partition,
 					numPartitions:       len(prevMap),
-					highestPriorityNode: highestPriorityNode,
+					topPriorityNode:     topPriorityNode,
 					stateNodeCounts:     stateNodeCounts,
 					nodeToNodeCounts:    nodeToNodeCounts,
 					nodePartitionCounts: nodePartitionCounts,
@@ -177,10 +177,10 @@ func planNextMap(
 
 		// Keep nodeToNodeCounts updated.
 		for _, candidateNode := range candidateNodes {
-			m, exists := nodeToNodeCounts[highestPriorityNode]
+			m, exists := nodeToNodeCounts[topPriorityNode]
 			if !exists {
 				m = make(map[string]int)
-				nodeToNodeCounts[highestPriorityNode] = m
+				nodeToNodeCounts[topPriorityNode] = m
 			}
 			m[candidateNode] = m[candidateNode] + 1
 		}
@@ -485,7 +485,7 @@ type nodeSorter struct {
 	stateName           string
 	partition           *Partition
 	numPartitions       int
-	highestPriorityNode string
+	topPriorityNode     string
 	stateNodeCounts     map[string]map[string]int
 	nodeToNodeCounts    map[string]map[string]int
 	nodePartitionCounts map[string]int
@@ -512,7 +512,7 @@ func (ns *nodeSorter) Score(i int) float64 {
 
 	lowerPriorityBalanceFactor := 0.0
 	if ns.nodeToNodeCounts != nil && ns.numPartitions > 0 {
-		m, exists := ns.nodeToNodeCounts[ns.highestPriorityNode]
+		m, exists := ns.nodeToNodeCounts[ns.topPriorityNode]
 		if exists {
 			lowerPriorityBalanceFactor =
 				float64(m[node]) / float64(ns.numPartitions)
@@ -580,9 +580,6 @@ func includeExcludeNodes(node string,
 	excludeLevel int,
 	mapParents map[string]string,
 	mapChildren map[string][]string) []string {
-	if node == "" {
-		return []string{}
-	}
 	incNodes := findLeaves(findAncestor(node, mapParents, includeLevel), mapChildren)
 	excNodes := findLeaves(findAncestor(node, mapParents, excludeLevel), mapChildren)
 	return StringsRemoveStrings(incNodes, excNodes)

@@ -1685,10 +1685,9 @@ func TestPlanNextMapVis(t *testing.T) {
 			expNumWarnings: 0,
 		},
 		{
-			// ISSUE: Perhaps node a is assigned too many slaves?  So,
-			// a failure / fail-over of node d means node a will take
-			// undue burdern.  Re-running the algorithm again, however,
-			// seems to stabilize (see next two cases).
+			// ISSUE: Looks like node b is assigned too many slaves?
+			// Re-running the algorithm again, however, seems to
+			// stabilize (see next two cases).
 			About: "8 partitions, 1 to 4 nodes",
 			FromTo: [][]string{
 				//             abcd
@@ -1697,7 +1696,7 @@ func TestPlanNextMapVis(t *testing.T) {
 				[]string{"m", "s  m"},
 				[]string{"m", " ms "},
 				[]string{"m", " sm "},
-				[]string{"m", "s  m"},
+				[]string{"m", " s m"},
 				[]string{"m", "ms  "},
 				[]string{"m", "m s "},
 			},
@@ -1709,18 +1708,16 @@ func TestPlanNextMapVis(t *testing.T) {
 		},
 		{
 			// Take output from previous case and use as input to this
-			// case to see that it reached more balanced'ness, but
-			// still a failure of node d means node a takes on still
-			// too much burdern (but better than the "before" map).
+			// case to see that it reached even more balanced'ness.
 			About: "8 partitions, 4 nodes don't change, 1 slave moved",
 			FromTo: [][]string{
 				//        abcd    abcd
-				[]string{"sm  ", " m s"}, // Slave moved to d for more balanced'ness.
+				[]string{"sm  ", "sm  "},
 				[]string{"  ms", "  ms"},
 				[]string{"s  m", "s  m"},
 				[]string{" ms ", " ms "},
-				[]string{" sm ", " sm "},
-				[]string{"s  m", "s  m"},
+				[]string{" sm ", "  ms"}, // Slave moved to d for more balanced'ness.
+				[]string{" s m", " s m"},
 				[]string{"ms  ", "ms  "},
 				[]string{"m s ", "m s "},
 			},
@@ -1736,12 +1733,12 @@ func TestPlanNextMapVis(t *testing.T) {
 			About: "8 partitions, 4 nodes don't change, so no changes",
 			FromTo: [][]string{
 				//        abcd    abcd
-				[]string{" m s", " m s"},
+				[]string{"sm  ", "sm  "},
 				[]string{"  ms", "  ms"},
 				[]string{"s  m", "s  m"},
 				[]string{" ms ", " ms "},
-				[]string{" sm ", " sm "},
-				[]string{"s  m", "s  m"},
+				[]string{" sm ", "  ms"},
+				[]string{" s m", " s m"},
 				[]string{"ms  ", "ms  "},
 				[]string{"m s ", "m s "},
 			},
@@ -1752,7 +1749,7 @@ func TestPlanNextMapVis(t *testing.T) {
 			expNumWarnings: 0,
 		},
 		{
-			// ISSUE: looks like the masters assigned to b moved
+			// TODO: ISSUE: looks like the masters assigned to b moved
 			// nicely to node e, but b's slaves didn't go to e
 			// cleanly.
 			About: "single node swap, from node b to node e",
@@ -1762,7 +1759,7 @@ func TestPlanNextMapVis(t *testing.T) {
 				[]string{"  ms", "  m s"}, // Non-optimal slave move?
 				[]string{"s  m", "s  m "},
 				[]string{" ms ", "  s m"},
-				[]string{" sm ", "  ms "}, // e didn't take over b's slave?
+				[]string{" sm ", "  ms "}, // c instead of e took over b's slave?
 				[]string{"s  m", "s  m "},
 				[]string{"ms  ", "m   s"},
 				[]string{"m s ", "m s  "},
@@ -1775,11 +1772,12 @@ func TestPlanNextMapVis(t *testing.T) {
 		},
 		{
 			// Masters stayed nicely stable during node removal.
+			// TODO: But, perhaps node a has too much load.
 			About: "4 nodes to 3 nodes, remove node d",
 			FromTo: [][]string{
 				//        abcd    abc
 				[]string{" m s", "sm "},
-				[]string{"  ms", " sm"},
+				[]string{"  ms", "s m"},
 				[]string{"s  m", "m s"},
 				[]string{" ms ", " ms"},
 				[]string{" sm ", " sm"},
@@ -1798,7 +1796,7 @@ func TestPlanNextMapVis(t *testing.T) {
 			// the constraints from 1 slave down to 0 slaves, so
 			// ignore this case for now.
 			Ignore: true,
-			About: "change constraints from 1 slave to 0 slaves",
+			About:  "change constraints from 1 slave to 0 slaves",
 			FromTo: [][]string{
 				//        abcd    abcd
 				[]string{" m s", " m  "},
@@ -1872,12 +1870,24 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 		"b": "r0",
 		"c": "r1",
 		"d": "r1",
+
+		// Racks r0 and r1 in the same zone z0.
+		"r0": "z0",
+		"r1": "z0",
 	}
-	hierarchyRulesSameRack := HierarchyRules{
+	hierarchyRulesWantSameRack := HierarchyRules{
 		"slave": []*HierarchyRule{
 			&HierarchyRule{
 				IncludeLevel: 1,
 				ExcludeLevel: 0,
+			},
+		},
+	}
+	hierarchyRulesWantOtherRack := HierarchyRules{
+		"slave": []*HierarchyRule{
+			&HierarchyRule{
+				IncludeLevel: 2,
+				ExcludeLevel: 1,
 			},
 		},
 	}
@@ -1890,10 +1900,10 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 				[]string{"", "sm  "},
 				[]string{"", "  ms"},
 				[]string{"", "  sm"},
-				[]string{"", "ms  "},
-				[]string{"", "sm  "},
-				[]string{"", "  ms"},
-				[]string{"", "  sm"},
+				[]string{"", "m s "},
+				[]string{"", " m s"},
+				[]string{"", "s m "},
+				[]string{"", " s m"},
 			},
 			Nodes:          []string{"a", "b", "c", "d"},
 			NodesToRemove:  []string{},
@@ -1904,7 +1914,7 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 			expNumWarnings: 0,
 		},
 		{
-			About: "2 racks, favor same rack",
+			About: "2 racks, favor same rack for slave",
 			FromTo: [][]string{
 				//            abcd
 				[]string{"", "ms  "},
@@ -1921,7 +1931,28 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 			NodesToAdd:     []string{"a", "b", "c", "d"},
 			Model:          partitionModel1Master1Slave,
 			NodeHierarchy:  nodeHierarchy2Rack,
-			HierarchyRules: hierarchyRulesSameRack,
+			HierarchyRules: hierarchyRulesWantSameRack,
+			expNumWarnings: 0,
+		},
+		{
+			About: "2 racks, favor other rack for slave",
+			FromTo: [][]string{
+				//            abcd
+				[]string{"", "m  s"},
+				[]string{"", " ms "},
+				[]string{"", "s m "},
+				[]string{"", " s m"},
+				[]string{"", "m s "},
+				[]string{"", " m s"},
+				[]string{"", " sm "},
+				[]string{"", "s  m"},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"a", "b", "c", "d"},
+			Model:          partitionModel1Master1Slave,
+			NodeHierarchy:  nodeHierarchy2Rack,
+			HierarchyRules: hierarchyRulesWantOtherRack,
 			expNumWarnings: 0,
 		},
 	}
