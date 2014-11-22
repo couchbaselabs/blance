@@ -1489,6 +1489,7 @@ func TestPlanNextMap(t *testing.T) {
 }
 
 type VisTestCase struct {
+	Ignore                bool
 	About                 string
 	FromTo                [][]string
 	Nodes                 []string
@@ -1514,6 +1515,9 @@ func testVisTestCases(t *testing.T, tests []VisTestCase) {
 		"s": "slave",
 	}
 	for i, c := range tests {
+		if c.Ignore {
+			continue
+		}
 		prevMap := PartitionMap{}
 		expMap := PartitionMap{}
 		for i, partitionFromTo := range c.FromTo {
@@ -1790,6 +1794,29 @@ func TestPlanNextMapVis(t *testing.T) {
 			expNumWarnings: 0,
 		},
 		{
+			// TODO: ISSUE: the slaves aren't cleared when we change
+			// the constraints from 1 slave down to 0 slaves, so
+			// ignore this case for now.
+			Ignore: true,
+			About: "change constraints from 1 slave to 0 slaves",
+			FromTo: [][]string{
+				//        abcd    abcd
+				[]string{" m s", " m  "},
+				[]string{"  ms", "  m "},
+				[]string{"s  m", "   m"},
+				[]string{" ms ", " m  "},
+				[]string{" sm ", "  m "},
+				[]string{"s  m", "   m"},
+				[]string{"ms  ", "m   "},
+				[]string{"m s ", "m   "},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{},
+			Model:          partitionModel1Master0Slave,
+			expNumWarnings: 0,
+		},
+		{
 			About: "8 partitions, 1 to 8 nodes",
 			FromTo: [][]string{
 				//             abcdefgh
@@ -1825,6 +1852,32 @@ func TestPlanNextMapVis(t *testing.T) {
 			NodesToRemove:  []string{},
 			NodesToAdd:     []string{"b", "c", "d", "e", "f", "g", "h"},
 			Model:          partitionModel1Master0Slave,
+			expNumWarnings: 0,
+		},
+	}
+	testVisTestCases(t, tests)
+}
+
+func TestPlanNextMapHierarchy(t *testing.T) {
+	partitionModel1Master1Slave := PartitionModel{
+		"master": &PartitionModelState{
+			Priority: 0, Constraints: 1,
+		},
+		"slave": &PartitionModelState{
+			Priority: 1, Constraints: 1,
+		},
+	}
+	tests := []VisTestCase{
+		{
+			About: "single node, simple assignment of master",
+			FromTo: [][]string{
+				[]string{"", "ms"},
+				[]string{"", "sm"},
+			},
+			Nodes:          []string{"a", "b"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"a", "b"},
+			Model:          partitionModel1Master1Slave,
 			expNumWarnings: 0,
 		},
 	}
