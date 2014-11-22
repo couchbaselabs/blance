@@ -2,6 +2,7 @@ package blance
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -1482,6 +1483,108 @@ func TestPlanNextMap(t *testing.T) {
 		}
 		if c.expNumWarnings != len(rWarnings) {
 			t.Errorf("i: %d, planNextMap.warnings, c: %#v, rWarnings: %d, expNumWarnings: %d",
+				i, c, rWarnings, c.expNumWarnings)
+		}
+	}
+}
+
+func TestPlanNextMapVis(t *testing.T) {
+	tests := []struct {
+		About                 string
+		FromTo                [][]string
+		Nodes                 []string
+		NodesToRemove         []string
+		NodesToAdd            []string
+		Model                 PartitionModel
+		ModelStateConstraints map[string]int
+		PartitionWeights      map[string]int
+		StateStickiness       map[string]int
+		NodeWeights           map[string]int
+		NodeHierarchy         map[string]string
+		HierarchyRules        HierarchyRules
+		expNumWarnings        int
+	}{
+		{
+			About:  "single node, simple assignment of master",
+			FromTo: [][]string{
+				[]string{"", "m"},
+				[]string{"", "m"},
+			},
+			Nodes:         []string{"a"},
+			NodesToRemove: []string{},
+			NodesToAdd:    []string{"a"},
+			Model: PartitionModel{
+				"master": &PartitionModelState{
+					Priority: 0, Constraints: 1,
+				},
+				"slave": &PartitionModelState{
+					Priority: 1, Constraints: 0,
+				},
+			},
+			expNumWarnings: 0,
+		},
+	}
+	nodeNames := map[int]string{} // Maps 0 to "a", 1 to "b", etc.
+	for i := 0; i < 26; i++ {
+		nodeNames[i] = fmt.Sprintf("%c", i + 97) // Start at ASCII 'a'.
+	}
+	stateNames := map[string]string {
+		"m" : "master",
+		"s" : "slave",
+	}
+	for i, c := range tests {
+		prevMap := PartitionMap{}
+		expMap := PartitionMap{}
+		for i, partitionFromTo := range c.FromTo {
+			partitionName := fmt.Sprintf("%d", i)
+			from := partitionFromTo[0]
+			to := partitionFromTo[1]
+
+			partition := &Partition{
+				Name: partitionName,
+				NodesByState: map[string][]string{},
+			}
+			prevMap[partitionName] = partition
+			for j := 0; j < len(from); j++ {
+				stateName := stateNames[from[j:j+1]]
+				partition.NodesByState[stateName] =
+					append(partition.NodesByState[stateName], nodeNames[j])
+			}
+
+			partition = &Partition{
+				Name: partitionName,
+				NodesByState: map[string][]string{},
+			}
+			expMap[partitionName] = partition
+			for j := 0; j < len(to); j++ {
+				stateName := stateNames[to[j:j+1]]
+				partition.NodesByState[stateName] =
+					append(partition.NodesByState[stateName], nodeNames[j])
+			}
+		}
+		r, rWarnings := PlanNextMap(
+			prevMap,
+			c.Nodes,
+			c.NodesToRemove,
+			c.NodesToAdd,
+			c.Model,
+			c.ModelStateConstraints,
+			c.PartitionWeights,
+			c.StateStickiness,
+			c.NodeWeights,
+			c.NodeHierarchy,
+			c.HierarchyRules)
+		if !reflect.DeepEqual(r, expMap) {
+			jc, _ := json.Marshal(c)
+			jp, _ := json.Marshal(prevMap)
+			jr, _ := json.Marshal(r)
+			jexp, _ := json.Marshal(expMap)
+			t.Errorf("i: %d, planNextMapVis, c: %s,\n"+
+				"   [INPUT] jp: %s,\n   [RESULT] r: %s,\n   [EXPECTED] exp: %s",
+				i, jc, jp, jr, jexp)
+		}
+		if c.expNumWarnings != len(rWarnings) {
+			t.Errorf("i: %d, planNextMapVis.warnings, c: %#v, rWarnings: %d, expNumWarnings: %d",
 				i, c, rWarnings, c.expNumWarnings)
 		}
 	}
