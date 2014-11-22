@@ -1867,17 +1867,32 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 			Priority: 1, Constraints: 1,
 		},
 	}
+	nodeHierarchy2Rack := map[string]string{
+		"a": "r0",
+		"b": "r0",
+		"c": "r1",
+		"d": "r1",
+	}
 	tests := []VisTestCase{
 		{
-			About: "single node, simple assignment of master",
+			About: "2 racks, but nil hierarchy rules",
 			FromTo: [][]string{
-				[]string{"", "ms"},
-				[]string{"", "sm"},
+				//            abcd
+				[]string{"", "ms  "},
+				[]string{"", "sm  "},
+				[]string{"", "  ms"},
+				[]string{"", "  sm"},
+				[]string{"", "ms  "},
+				[]string{"", "sm  "},
+				[]string{"", "  ms"},
+				[]string{"", "  sm"},
 			},
-			Nodes:          []string{"a", "b"},
+			Nodes:          []string{"a", "b", "c", "d"},
 			NodesToRemove:  []string{},
-			NodesToAdd:     []string{"a", "b"},
+			NodesToAdd:     []string{"a", "b", "c", "d"},
 			Model:          partitionModel1Master1Slave,
+			NodeHierarchy:  nodeHierarchy2Rack,
+			HierarchyRules: nil,
 			expNumWarnings: 0,
 		},
 	}
