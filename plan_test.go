@@ -1488,6 +1488,22 @@ func TestPlanNextMap(t *testing.T) {
 	}
 }
 
+type VisTestCase struct {
+	About                 string
+	FromTo                [][]string
+	Nodes                 []string
+	NodesToRemove         []string
+	NodesToAdd            []string
+	Model                 PartitionModel
+	ModelStateConstraints map[string]int
+	PartitionWeights      map[string]int
+	StateStickiness       map[string]int
+	NodeWeights           map[string]int
+	NodeHierarchy         map[string]string
+	HierarchyRules        HierarchyRules
+	expNumWarnings        int
+}
+
 func TestPlanNextMapVis(t *testing.T) {
 	partitionModel1Master0Slave := PartitionModel{
 		"master": &PartitionModelState{
@@ -1505,21 +1521,7 @@ func TestPlanNextMapVis(t *testing.T) {
 			Priority: 1, Constraints: 1,
 		},
 	}
-	tests := []struct {
-		About                 string
-		FromTo                [][]string
-		Nodes                 []string
-		NodesToRemove         []string
-		NodesToAdd            []string
-		Model                 PartitionModel
-		ModelStateConstraints map[string]int
-		PartitionWeights      map[string]int
-		StateStickiness       map[string]int
-		NodeWeights           map[string]int
-		NodeHierarchy         map[string]string
-		HierarchyRules        HierarchyRules
-		expNumWarnings        int
-	}{
+	tests := []VisTestCase{
 		{
 			About: "single node, simple assignment of master",
 			FromTo: [][]string{
@@ -1754,6 +1756,10 @@ func TestPlanNextMapVis(t *testing.T) {
 			expNumWarnings: 0,
 		},
 	}
+	testVisTestCases(t, tests)
+}
+
+func testVisTestCases(t *testing.T, tests []VisTestCase) {
 	nodeNames := map[int]string{} // Maps 0 to "a", 1 to "b", etc.
 	for i := 0; i < 26; i++ {
 		nodeNames[i] = fmt.Sprintf("%c", i+97) // Start at ASCII 'a'.
@@ -1818,7 +1824,8 @@ func TestPlanNextMapVis(t *testing.T) {
 				i, jc, jp, jr, jexp)
 		}
 		if c.expNumWarnings != len(rWarnings) {
-			t.Errorf("i: %d, planNextMapVis.warnings, c: %#v, rWarnings: %d, expNumWarnings: %d",
+			t.Errorf("i: %d, planNextMapVis.warnings, c: %#v,"+
+				" rWarnings: %d, expNumWarnings: %d",
 				i, c, rWarnings, c.expNumWarnings)
 		}
 	}
