@@ -357,6 +357,16 @@ func TestMapParentsToMapChildren(t *testing.T) {
 				"r": []string{"a"},
 				"a": []string{"a1"},
 			}},
+		{map[string]string{"a": "r", "a1": "a", "a2": "a"},
+			map[string][]string{
+				"r": []string{"a"},
+				"a": []string{"a1", "a2"},
+			}},
+		{map[string]string{"a": "r", "a1": "a", "a2": "a", "a0": "a"},
+			map[string][]string{
+				"r": []string{"a"},
+				"a": []string{"a0", "a1", "a2"},
+			}},
 	}
 	for i, c := range tests {
 		r := mapParentsToMapChildren(c.in)
