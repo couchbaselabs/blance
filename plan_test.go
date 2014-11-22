@@ -1938,12 +1938,12 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 			About: "2 racks, favor other rack for slave",
 			FromTo: [][]string{
 				//            abcd
-				[]string{"", "m  s"},
-				[]string{"", " ms "},
-				[]string{"", "s m "},
-				[]string{"", " s m"},
 				[]string{"", "m s "},
 				[]string{"", " m s"},
+				[]string{"", "s m "},
+				[]string{"", " s m"},
+				[]string{"", "m  s"},
+				[]string{"", " ms "},
 				[]string{"", " sm "},
 				[]string{"", "s  m"},
 			},
