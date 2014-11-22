@@ -852,14 +852,12 @@ func TestPlanNextMap(t *testing.T) {
 			About: "add 2 nodes, 2 masters, 1 slave",
 			PrevMap: PartitionMap{
 				"0": &Partition{
-					Name: "0",
-					NodesByState: map[string][]string{
-					},
+					Name:         "0",
+					NodesByState: map[string][]string{},
 				},
 				"1": &Partition{
-					Name: "1",
-					NodesByState: map[string][]string{
-					},
+					Name:         "1",
+					NodesByState: map[string][]string{},
 				},
 			},
 			Nodes:         []string{"a", "b"},
@@ -899,14 +897,12 @@ func TestPlanNextMap(t *testing.T) {
 			About: "add 3 nodes, 2 masters, 1 slave",
 			PrevMap: PartitionMap{
 				"0": &Partition{
-					Name: "0",
-					NodesByState: map[string][]string{
-					},
+					Name:         "0",
+					NodesByState: map[string][]string{},
 				},
 				"1": &Partition{
-					Name: "1",
-					NodesByState: map[string][]string{
-					},
+					Name:         "1",
+					NodesByState: map[string][]string{},
 				},
 			},
 			Nodes:         []string{"a", "b", "c"},
@@ -937,6 +933,54 @@ func TestPlanNextMap(t *testing.T) {
 					NodesByState: map[string][]string{
 						"master": []string{"c", "a"},
 						"slave":  []string{"b"},
+					},
+				},
+			},
+			expNumWarnings: 0,
+		},
+		{
+			About: "model state constraint override",
+			PrevMap: PartitionMap{
+				"0": &Partition{
+					Name:         "0",
+					NodesByState: map[string][]string{},
+				},
+				"1": &Partition{
+					Name:         "1",
+					NodesByState: map[string][]string{},
+				},
+			},
+			Nodes:         []string{"a", "b"},
+			NodesToRemove: []string{},
+			NodesToAdd:    []string{"a", "b"},
+			Model: PartitionModel{
+				"master": &PartitionModelState{
+					Priority: 0, Constraints: 0,
+				},
+				"slave": &PartitionModelState{
+					Priority: 1, Constraints: 0,
+				},
+			},
+			ModelStateConstraints: map[string]int{
+				"master": 1,
+				"slave":  1,
+			},
+			PartitionWeights: nil,
+			StateStickiness:  nil,
+			NodeWeights:      nil,
+			exp: PartitionMap{
+				"0": &Partition{
+					Name: "0",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+						"slave":  []string{"b"},
+					},
+				},
+				"1": &Partition{
+					Name: "1",
+					NodesByState: map[string][]string{
+						"master": []string{"b"},
+						"slave":  []string{"a"},
 					},
 				},
 			},
