@@ -1987,6 +1987,29 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 			HierarchyRules: hierarchyRulesWantOtherRack,
 			expNumWarnings: 0,
 		},
+		{
+			// NOTE: following the hierarchy rules for slaves, node a
+			// takes on undue burden after removing node b,
+			About: "2 racks, remove 1 node from rack 1",
+			FromTo: [][]string{
+				//        abcd    abcd
+				[]string{"m s ", "m s "},
+				[]string{" m s", "m  s"},
+				[]string{"s m ", "s m "},
+				[]string{" s m", "s  m"},
+				[]string{"m  s", "m  s"},
+				[]string{" ms ", "s m "},
+				[]string{" sm ", "s m "},
+				[]string{"s  m", "s  m"},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{"b"},
+			NodesToAdd:     []string{},
+			Model:          partitionModel1Master1Slave,
+			NodeHierarchy:  nodeHierarchy2Rack,
+			HierarchyRules: hierarchyRulesWantOtherRack,
+			expNumWarnings: 0,
+		},
 	}
 	testVisTestCases(t, tests)
 }
