@@ -1609,7 +1609,8 @@ func TestPlanNextMapVis(t *testing.T) {
 		{
 			// ISSUE: Perhaps node a is assigned too many slaves?  So,
 			// a failure / fail-over of node d means node a will take
-			// undue burdern.
+			// undue burdern.  Re-running the algorithm again, however,
+			// seems to stabilize (see next two cases).
 			About: "8 partitions, 1 to 4 nodes",
 			FromTo: [][]string{
 				//             abcd
@@ -1625,6 +1626,50 @@ func TestPlanNextMapVis(t *testing.T) {
 			Nodes:          []string{"a", "b", "c", "d"},
 			NodesToRemove:  []string{},
 			NodesToAdd:     []string{"b", "c", "d"},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
+		{
+			// Take output from previous case and use as input to this
+			// case to see that it reached more balanced'ness, but
+			// still a failure of node d means node a takes on still
+			// too much burdern (but better than the "before" map).
+			About: "8 partitions, 4 nodes don't change, 1 slave moved",
+			FromTo: [][]string{
+				//        abcd    abcd
+				[]string{"sm  ", " m s"}, // Slave moved to d for more balanced'ness.
+				[]string{"  ms", "  ms"},
+				[]string{"s  m", "s  m"},
+				[]string{" ms ", " ms "},
+				[]string{" sm ", " sm "},
+				[]string{"s  m", "s  m"},
+				[]string{"ms  ", "ms  "},
+				[]string{"m s ", "m s "},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
+		{
+			// Take output from previous case and use as input to this
+			// case, and see that it stabilized...
+			About: "8 partitions, 4 nodes don't change, so no changes",
+			FromTo: [][]string{
+				//        abcd    abcd
+				[]string{" m s", " m s"},
+				[]string{"  ms", "  ms"},
+				[]string{"s  m", "s  m"},
+				[]string{" ms ", " ms "},
+				[]string{" sm ", " sm "},
+				[]string{"s  m", "s  m"},
+				[]string{"ms  ", "ms  "},
+				[]string{"m s ", "m s "},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{},
 			Model:          partitionModel1Master1Slave,
 			expNumWarnings: 0,
 		},
