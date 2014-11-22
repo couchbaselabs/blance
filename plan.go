@@ -597,14 +597,11 @@ func findAncestor(node string, mapParents map[string]string, level int) string {
 }
 
 func findLeaves(node string, mapChildren map[string][]string) []string {
-	if node == "" {
-		return []string{}
-	}
 	children := mapChildren[node]
-	if children == nil {
-		return []string{node}
+	if len(children) <= 0 {
+		return []string{node} // Node is a leaf.
 	}
-	rv := []string{}
+	rv := make([]string, 0)
 	for _, c := range children {
 		rv = append(rv, findLeaves(c, mapChildren)...)
 	}

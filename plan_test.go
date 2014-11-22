@@ -317,6 +317,26 @@ func TestFindAncestor(t *testing.T) {
 	}
 }
 
+func TestFindLeaves(t *testing.T) {
+	tests := []struct {
+		mapChildren map[string][]string
+		exp         []string
+	}{
+		{map[string][]string{}, []string{"a"}},
+		{map[string][]string{"x": []string{"xx"}}, []string{"a"}},
+		{map[string][]string{"a": []string{}}, []string{"a"}},
+		{map[string][]string{"a": []string{"b"}}, []string{"b"}},
+		{map[string][]string{"a": []string{"b", "c"}}, []string{"b", "c"}},
+	}
+	for i, c := range tests {
+		r := findLeaves("a", c.mapChildren)
+		if !reflect.DeepEqual(r, c.exp) {
+			t.Errorf("i: %d, mapChildren: %#v, RESULT: %#v, EXPECTED: %#v",
+				i, c.mapChildren, r, c.exp)
+		}
+	}
+}
+
 func TestMapParentsToMapChildren(t *testing.T) {
 	tests := []struct {
 		in  map[string]string
