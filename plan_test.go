@@ -1880,6 +1880,7 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 		"b": "r0",
 		"c": "r1",
 		"d": "r1",
+		"e": "r1",
 
 		// Racks r0 and r1 in the same zone z0.
 		"r0": "z0",
@@ -1960,6 +1961,27 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 			Nodes:          []string{"a", "b", "c", "d"},
 			NodesToRemove:  []string{},
 			NodesToAdd:     []string{"a", "b", "c", "d"},
+			Model:          partitionModel1Master1Slave,
+			NodeHierarchy:  nodeHierarchy2Rack,
+			HierarchyRules: hierarchyRulesWantOtherRack,
+			expNumWarnings: 0,
+		},
+		{
+			About: "2 racks, add node to 2nd rack",
+			FromTo: [][]string{
+				//        abcd    abcde
+				[]string{"m s ", "s   m"},
+				[]string{" m s", " m  s"},
+				[]string{"s m ", "s m  "},
+				[]string{" s m", " s m "},
+				[]string{"m  s", "m  s "},
+				[]string{" ms ", " ms  "},
+				[]string{" sm ", " sm  "},
+				[]string{"s  m", "s  m "},
+			},
+			Nodes:          []string{"a", "b", "c", "d", "e"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"e"},
 			Model:          partitionModel1Master1Slave,
 			NodeHierarchy:  nodeHierarchy2Rack,
 			HierarchyRules: hierarchyRulesWantOtherRack,
