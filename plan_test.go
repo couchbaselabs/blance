@@ -1677,7 +1677,7 @@ func TestPlanNextMapVis(t *testing.T) {
 			// ISSUE: looks like the masters assigned to b moved
 			// nicely to node e, but b's slaves didn't go to e
 			// cleanly.
-			About: "Single node swap, from node b to node e",
+			About: "single node swap, from node b to node e",
 			FromTo: [][]string{
 				//        abcd    abcde
 				[]string{" m s", "   sm"},
@@ -1692,6 +1692,26 @@ func TestPlanNextMapVis(t *testing.T) {
 			Nodes:          []string{"a", "b", "c", "d", "e"},
 			NodesToRemove:  []string{"b"},
 			NodesToAdd:     []string{"e"},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
+		{
+			// Masters stayed nicely stable during node removal.
+			About: "4 nodes to 3 nodes, remove node d",
+			FromTo: [][]string{
+				//        abcd    abc
+				[]string{" m s", "sm "},
+				[]string{"  ms", " sm"},
+				[]string{"s  m", "m s"},
+				[]string{" ms ", " ms"},
+				[]string{" sm ", " sm"},
+				[]string{"s  m", "sm "},
+				[]string{"ms  ", "ms "},
+				[]string{"m s ", "m s"},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{"d"},
+			NodesToAdd:     []string{},
 			Model:          partitionModel1Master1Slave,
 			expNumWarnings: 0,
 		},
