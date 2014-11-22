@@ -302,6 +302,8 @@ func TestPlanNextMap(t *testing.T) {
 		PartitionWeights      map[string]int
 		StateStickiness       map[string]int
 		NodeWeights           map[string]int
+		NodeHierarchy         map[string]string
+		HierarchyRules        HierarchyRules
 		exp                   PartitionMap
 		expNumWarnings        int
 	}{
@@ -1392,7 +1394,9 @@ func TestPlanNextMap(t *testing.T) {
 			c.ModelStateConstraints,
 			c.PartitionWeights,
 			c.StateStickiness,
-			c.NodeWeights)
+			c.NodeWeights,
+			c.NodeHierarchy,
+			c.HierarchyRules)
 		if !reflect.DeepEqual(r, c.exp) {
 			jc, _ := json.Marshal(c)
 			jr, _ := json.Marshal(r)

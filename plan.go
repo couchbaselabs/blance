@@ -27,6 +27,8 @@ func planNextMap(
 	partitionWeights map[string]int, // Keyed by partitionName.
 	stateStickiness map[string]int, // Keyed by stateName.
 	nodeWeights map[string]int, // Keyed by node.
+	nodeHierarchy map[string]string, // Keyed by node, value is node's parent.
+	hierarchyRules HierarchyRules,
 ) (PartitionMap, []string) {
 	warnings := []string{}
 

@@ -55,6 +55,18 @@ type PartitionModelState struct {
 	Constraints int
 }
 
+// HierarchyRules example:
+// {"slave":[{IncludeLevel:1,ExcludeLevel:0}]}.
+// Another example:
+// {"slave":[{IncludeLevel:1,ExcludeLevel:0},
+//           {IncludeLevel:2,ExcludeLevel:1}]}.
+type HierarchyRules map[string][]*HierarchyRule
+
+type HierarchyRule struct {
+	IncludeLevel int
+	ExcludeLevel int
+}
+
 // PlanNextMap is the main entry point.
 func PlanNextMap(
 	prevMap PartitionMap,
@@ -66,11 +78,15 @@ func PlanNextMap(
 	partitionWeights map[string]int, // Keyed by partitionName.
 	stateStickiness map[string]int, // Keyed by stateName.
 	nodeWeights map[string]int, // Keyed by node.
+	nodeHierarchy map[string]string, // Keyed by node, value is node's parent.
+	hierarchyRules HierarchyRules,
 ) (nextMap PartitionMap, warnings []string) {
 	return planNextMap(prevMap,
 		nodes, nodesToRemove, nodesToAdd,
 		model, modelStateConstraints,
 		partitionWeights,
 		stateStickiness,
-		nodeWeights)
+		nodeWeights,
+		nodeHierarchy,
+		hierarchyRules)
 }
