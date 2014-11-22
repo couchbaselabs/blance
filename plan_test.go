@@ -1126,6 +1126,91 @@ func TestPlanNextMap(t *testing.T) {
 			},
 			expNumWarnings: 0,
 		},
+		{
+			About: "node weight of 3 for node a",
+			PrevMap: PartitionMap{
+				"0": &Partition{
+					Name:         "0",
+					NodesByState: map[string][]string{},
+				},
+				"1": &Partition{
+					Name:         "1",
+					NodesByState: map[string][]string{},
+				},
+				"2": &Partition{
+					Name:         "2",
+					NodesByState: map[string][]string{},
+				},
+				"3": &Partition{
+					Name:         "3",
+					NodesByState: map[string][]string{},
+				},
+				"4": &Partition{
+					Name:         "4",
+					NodesByState: map[string][]string{},
+				},
+				"5": &Partition{
+					Name:         "5",
+					NodesByState: map[string][]string{},
+				},
+			},
+			Nodes:         []string{"a", "b"},
+			NodesToRemove: []string{},
+			NodesToAdd:    []string{"a", "b"},
+			Model: PartitionModel{
+				"master": &PartitionModelState{
+					Priority: 0, Constraints: 1,
+				},
+				"slave": &PartitionModelState{
+					Priority: 1, Constraints: 0,
+				},
+			},
+			ModelStateConstraints: nil,
+			PartitionWeights:      nil,
+			StateStickiness:       nil,
+			NodeWeights:           map[string]int{
+				"a": 3,
+			},
+			exp: PartitionMap{
+				"0": &Partition{
+					Name: "0",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+					},
+				},
+				"1": &Partition{
+					Name: "1",
+					NodesByState: map[string][]string{
+						"master": []string{"b"},
+					},
+				},
+				"2": &Partition{
+					Name: "2",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+					},
+				},
+				"3": &Partition{
+					Name: "3",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+					},
+				},
+				"4": &Partition{
+					Name:         "4",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+					},
+				},
+				"5": &Partition{
+					Name:         "5",
+					NodesByState: map[string][]string{
+						"master": []string{"b"},
+					},
+				},
+			},
+			expNumWarnings: 0,
+		},
 	}
 	for i, c := range tests {
 		r, rWarnings := PlanNextMap(
