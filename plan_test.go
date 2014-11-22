@@ -290,6 +290,33 @@ func TestPartitionMapToArrayCopy(t *testing.T) {
 	}
 }
 
+func TestFindAncestor(t *testing.T) {
+	tests := []struct {
+		level      int
+		mapParents map[string]string
+		exp        string
+	}{
+		{0, map[string]string{}, "a"},
+		{1, map[string]string{}, ""},
+		{2, map[string]string{}, ""},
+		{0, map[string]string{"a": "r"}, "a"},
+		{1, map[string]string{"a": "r"}, "r"},
+		{2, map[string]string{"a": "r"}, ""},
+		{3, map[string]string{"a": "r"}, ""},
+		{0, map[string]string{"a": "r", "r": "g"}, "a"},
+		{1, map[string]string{"a": "r", "r": "g"}, "r"},
+		{2, map[string]string{"a": "r", "r": "g"}, "g"},
+		{3, map[string]string{"a": "r", "r": "g"}, ""},
+	}
+	for i, c := range tests {
+		r := findAncestor("a", c.mapParents, c.level)
+		if !reflect.DeepEqual(r, c.exp) {
+			t.Errorf("i: %d, level: %d, mapParents: %#v, RESULT: %#v, EXPECTED: %#v",
+				i, c.level, c.mapParents, r, c.exp)
+		}
+	}
+}
+
 func TestMapParentsToMapChildren(t *testing.T) {
 	tests := []struct {
 		in  map[string]string
