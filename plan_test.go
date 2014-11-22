@@ -746,6 +746,57 @@ func TestPlanNextMap(t *testing.T) {
 			},
 			expNumWarnings: 0,
 		},
+		{
+			About: "2 nodes, swap node b",
+			PrevMap: PartitionMap{
+				"0": &Partition{
+					Name: "0",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+						"slave":  []string{"b"},
+					},
+				},
+				"1": &Partition{
+					Name: "1",
+					NodesByState: map[string][]string{
+						"master": []string{"b"},
+						"slave":  []string{"a"},
+					},
+				},
+			},
+			Nodes:         []string{"a", "b", "c"},
+			NodesToRemove: []string{"b"},
+			NodesToAdd:    []string{"c"},
+			Model: PartitionModel{
+				"master": &PartitionModelState{
+					Priority: 0, Constraints: 1,
+				},
+				"slave": &PartitionModelState{
+					Priority: 1, Constraints: 1,
+				},
+			},
+			ModelStateConstraints: nil,
+			PartitionWeights:      nil,
+			StateStickiness:       nil,
+			NodeWeights:           nil,
+			exp: PartitionMap{
+				"0": &Partition{
+					Name: "0",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+						"slave":  []string{"c"},
+					},
+				},
+				"1": &Partition{
+					Name: "1",
+					NodesByState: map[string][]string{
+						"master": []string{"c"},
+						"slave":  []string{"a"},
+					},
+				},
+			},
+			expNumWarnings: 0,
+		},
 	}
 	for i, c := range tests {
 		r, rWarnings := PlanNextMap(
