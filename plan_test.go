@@ -1592,6 +1592,61 @@ func TestPlanNextMapVis(t *testing.T) {
 			Model:          partitionModel1Master1Slave,
 			expNumWarnings: 0,
 		},
+		{
+			About: "4 partitions, 1 to 4 nodes",
+			FromTo: [][]string{
+				[]string{"m", "sm  "},
+				[]string{"m", "  ms"},
+				[]string{"m", "  sm"},
+				[]string{"m", "ms  "},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"b", "c", "d"},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
+		{
+			// ISSUE: Perhaps node a is assigned too many slaves?  So,
+			// a failure / fail-over of node d means node a will take
+			// undue burdern.
+			About: "8 partitions, 1 to 4 nodes",
+			FromTo: [][]string{
+				//             abcd
+				[]string{"m", "sm  "},
+				[]string{"m", "  ms"},
+				[]string{"m", "s  m"},
+				[]string{"m", " ms "},
+				[]string{"m", " sm "},
+				[]string{"m", "s  m"},
+				[]string{"m", "ms  "},
+				[]string{"m", "m s "},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"b", "c", "d"},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
+		{
+			About: "8 partitions, 1 to 8 nodes",
+			FromTo: [][]string{
+				//             abcdefgh
+				[]string{"m", "s      m"},
+				[]string{"m", "  s   m "},
+				[]string{"m", "   s m  "},
+				[]string{"m", "    ms  "},
+				[]string{"m", " m  s   "},
+				[]string{"m", "   m  s "},
+				[]string{"m", "  m    s"},
+				[]string{"m", "ms      "},
+			},
+			Nodes:          []string{"a", "b", "c", "d", "e", "f", "g", "h"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"b", "c", "d", "e", "f", "g", "h"},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
 	}
 	nodeNames := map[int]string{} // Maps 0 to "a", 1 to "b", etc.
 	for i := 0; i < 26; i++ {
