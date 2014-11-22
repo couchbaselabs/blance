@@ -1647,6 +1647,25 @@ func TestPlanNextMapVis(t *testing.T) {
 			Model:          partitionModel1Master1Slave,
 			expNumWarnings: 0,
 		},
+		{
+			About: "8 partitions, 1 to 8 nodes, 0 slaves",
+			FromTo: [][]string{
+				//             abcdefgh
+				[]string{"m", "       m"},
+				[]string{"m", "      m "},
+				[]string{"m", "     m  "},
+				[]string{"m", "    m   "},
+				[]string{"m", " m      "},
+				[]string{"m", "   m    "},
+				[]string{"m", "  m     "},
+				[]string{"m", "m       "},
+			},
+			Nodes:          []string{"a", "b", "c", "d", "e", "f", "g", "h"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"b", "c", "d", "e", "f", "g", "h"},
+			Model:          partitionModel1Master0Slave,
+			expNumWarnings: 0,
+		},
 	}
 	nodeNames := map[int]string{} // Maps 0 to "a", 1 to "b", etc.
 	for i := 0; i < 26; i++ {
