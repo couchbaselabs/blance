@@ -395,14 +395,16 @@ func (r *partitionSorter) Score(i int) []string {
 		partitionNameStr = fmt.Sprintf("%10d", partitionN)
 	}
 
-	// Calculate partition weight, and zero-pad it for sortability.
+	// Calculate partition weight, and zero-pad it for sortability,
+	// where the nine 9's magic number is to to allow heavier
+	// partitions to come first.
 	partitionWeight := 1
 	if r.partitionWeights != nil {
 		if w, exists := r.partitionWeights[partitionName]; exists {
 			partitionWeight = w
 		}
 	}
-	partitionWeightStr := fmt.Sprintf("%10d", partitionWeight)
+	partitionWeightStr := fmt.Sprintf("%10d", 999999999 - partitionWeight)
 
 	// First, favor partitions on nodes that are to-be-removed.
 	if r.prevMap != nil &&

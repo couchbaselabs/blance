@@ -986,6 +986,71 @@ func TestPlanNextMap(t *testing.T) {
 			},
 			expNumWarnings: 0,
 		},
+		{
+			About: "partition weight of 3 for partition 0",
+			PrevMap: PartitionMap{
+				"0": &Partition{
+					Name:         "0",
+					NodesByState: map[string][]string{},
+				},
+				"1": &Partition{
+					Name:         "1",
+					NodesByState: map[string][]string{},
+				},
+				"2": &Partition{
+					Name:         "2",
+					NodesByState: map[string][]string{},
+				},
+				"3": &Partition{
+					Name:         "3",
+					NodesByState: map[string][]string{},
+				},
+			},
+			Nodes:         []string{"a", "b"},
+			NodesToRemove: []string{},
+			NodesToAdd:    []string{"a", "b"},
+			Model: PartitionModel{
+				"master": &PartitionModelState{
+					Priority: 0, Constraints: 1,
+				},
+				"slave": &PartitionModelState{
+					Priority: 1, Constraints: 0,
+				},
+			},
+			ModelStateConstraints: nil,
+			PartitionWeights:      map[string]int{
+				"0": 3,
+			},
+			StateStickiness:  nil,
+			NodeWeights:      nil,
+			exp: PartitionMap{
+				"0": &Partition{
+					Name: "0",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+					},
+				},
+				"1": &Partition{
+					Name: "1",
+					NodesByState: map[string][]string{
+						"master": []string{"b"},
+					},
+				},
+				"2": &Partition{
+					Name: "2",
+					NodesByState: map[string][]string{
+						"master": []string{"b"},
+					},
+				},
+				"3": &Partition{
+					Name: "3",
+					NodesByState: map[string][]string{
+						"master": []string{"b"},
+					},
+				},
+			},
+			expNumWarnings: 0,
+		},
 	}
 	for i, c := range tests {
 		r, rWarnings := PlanNextMap(
