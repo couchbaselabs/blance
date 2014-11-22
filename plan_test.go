@@ -1568,6 +1568,30 @@ func TestPlanNextMapVis(t *testing.T) {
 			Model:          partitionModel1Master1Slave,
 			expNumWarnings: 0,
 		},
+		{
+			About: "2 unbalanced nodes to balanced'ness",
+			FromTo: [][]string{
+				[]string{"ms", "sm"},
+				[]string{"ms", "ms"},
+			},
+			Nodes:          []string{"a", "b"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
+		{
+			About: "2 unbalanced nodes to 3 balanced nodes",
+			FromTo: [][]string{
+				[]string{"ms", " sm"},
+				[]string{"ms", "m s"},
+			},
+			Nodes:          []string{"a", "b", "c"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"c"},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
 	}
 	nodeNames := map[int]string{} // Maps 0 to "a", 1 to "b", etc.
 	for i := 0; i < 26; i++ {
