@@ -1504,6 +1504,78 @@ type VisTestCase struct {
 	expNumWarnings        int
 }
 
+func testVisTestCases(t *testing.T, tests []VisTestCase) {
+	nodeNames := map[int]string{} // Maps 0 to "a", 1 to "b", etc.
+	for i := 0; i < 26; i++ {
+		nodeNames[i] = fmt.Sprintf("%c", i+97) // Start at ASCII 'a'.
+	}
+	stateNames := map[string]string{
+		"m": "master",
+		"s": "slave",
+	}
+	for i, c := range tests {
+		prevMap := PartitionMap{}
+		expMap := PartitionMap{}
+		for i, partitionFromTo := range c.FromTo {
+			partitionName := fmt.Sprintf("%d", i)
+			from := partitionFromTo[0]
+			to := partitionFromTo[1]
+
+			partition := &Partition{
+				Name:         partitionName,
+				NodesByState: map[string][]string{},
+			}
+			prevMap[partitionName] = partition
+			for j := 0; j < len(from); j++ {
+				stateName := stateNames[from[j:j+1]]
+				if stateName != "" {
+					partition.NodesByState[stateName] =
+						append(partition.NodesByState[stateName], nodeNames[j])
+				}
+			}
+
+			partition = &Partition{
+				Name:         partitionName,
+				NodesByState: map[string][]string{},
+			}
+			expMap[partitionName] = partition
+			for j := 0; j < len(to); j++ {
+				stateName := stateNames[to[j:j+1]]
+				if stateName != "" {
+					partition.NodesByState[stateName] =
+						append(partition.NodesByState[stateName], nodeNames[j])
+				}
+			}
+		}
+		r, rWarnings := PlanNextMap(
+			prevMap,
+			c.Nodes,
+			c.NodesToRemove,
+			c.NodesToAdd,
+			c.Model,
+			c.ModelStateConstraints,
+			c.PartitionWeights,
+			c.StateStickiness,
+			c.NodeWeights,
+			c.NodeHierarchy,
+			c.HierarchyRules)
+		if !reflect.DeepEqual(r, expMap) {
+			jc, _ := json.Marshal(c)
+			jp, _ := json.Marshal(prevMap)
+			jr, _ := json.Marshal(r)
+			jexp, _ := json.Marshal(expMap)
+			t.Errorf("i: %d, planNextMapVis, c: %s,"+
+				"\nINPUT jp: %s,\nRESULT r: %s,\nEXPECTED: %s",
+				i, jc, jp, jr, jexp)
+		}
+		if c.expNumWarnings != len(rWarnings) {
+			t.Errorf("i: %d, planNextMapVis.warnings, c: %#v,"+
+				" rWarnings: %d, expNumWarnings: %d",
+				i, c, rWarnings, c.expNumWarnings)
+		}
+	}
+}
+
 func TestPlanNextMapVis(t *testing.T) {
 	partitionModel1Master0Slave := PartitionModel{
 		"master": &PartitionModelState{
@@ -1757,76 +1829,4 @@ func TestPlanNextMapVis(t *testing.T) {
 		},
 	}
 	testVisTestCases(t, tests)
-}
-
-func testVisTestCases(t *testing.T, tests []VisTestCase) {
-	nodeNames := map[int]string{} // Maps 0 to "a", 1 to "b", etc.
-	for i := 0; i < 26; i++ {
-		nodeNames[i] = fmt.Sprintf("%c", i+97) // Start at ASCII 'a'.
-	}
-	stateNames := map[string]string{
-		"m": "master",
-		"s": "slave",
-	}
-	for i, c := range tests {
-		prevMap := PartitionMap{}
-		expMap := PartitionMap{}
-		for i, partitionFromTo := range c.FromTo {
-			partitionName := fmt.Sprintf("%d", i)
-			from := partitionFromTo[0]
-			to := partitionFromTo[1]
-
-			partition := &Partition{
-				Name:         partitionName,
-				NodesByState: map[string][]string{},
-			}
-			prevMap[partitionName] = partition
-			for j := 0; j < len(from); j++ {
-				stateName := stateNames[from[j:j+1]]
-				if stateName != "" {
-					partition.NodesByState[stateName] =
-						append(partition.NodesByState[stateName], nodeNames[j])
-				}
-			}
-
-			partition = &Partition{
-				Name:         partitionName,
-				NodesByState: map[string][]string{},
-			}
-			expMap[partitionName] = partition
-			for j := 0; j < len(to); j++ {
-				stateName := stateNames[to[j:j+1]]
-				if stateName != "" {
-					partition.NodesByState[stateName] =
-						append(partition.NodesByState[stateName], nodeNames[j])
-				}
-			}
-		}
-		r, rWarnings := PlanNextMap(
-			prevMap,
-			c.Nodes,
-			c.NodesToRemove,
-			c.NodesToAdd,
-			c.Model,
-			c.ModelStateConstraints,
-			c.PartitionWeights,
-			c.StateStickiness,
-			c.NodeWeights,
-			c.NodeHierarchy,
-			c.HierarchyRules)
-		if !reflect.DeepEqual(r, expMap) {
-			jc, _ := json.Marshal(c)
-			jp, _ := json.Marshal(prevMap)
-			jr, _ := json.Marshal(r)
-			jexp, _ := json.Marshal(expMap)
-			t.Errorf("i: %d, planNextMapVis, c: %s,"+
-				"\nINPUT jp: %s,\nRESULT r: %s,\nEXPECTED: %s",
-				i, jc, jp, jr, jexp)
-		}
-		if c.expNumWarnings != len(rWarnings) {
-			t.Errorf("i: %d, planNextMapVis.warnings, c: %#v,"+
-				" rWarnings: %d, expNumWarnings: %d",
-				i, c, rWarnings, c.expNumWarnings)
-		}
-	}
 }
