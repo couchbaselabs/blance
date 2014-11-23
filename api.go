@@ -75,19 +75,19 @@ type HierarchyRules map[string][]*HierarchyRule
 // Then, ExcludeLevel is processed to remove or exclude nodes from
 // that set.  For example, for this containment tree, (datacenter0
 // (rack0 (nodeA nodeB)) (rack1 (nodeC nodeD))), lets focus on nodeA.
-// If IncludeLevel is 1, then that means go up 1 parent (so, rack0)
-// and take all of rack0's leaves: nodeA and nodeB.  So, the candidate
-// nodes of nodeA and nodeB are all on the same rack as nodeA.  If
-// instead the IncludeLevel was 2 and ExcludeLevel was 1, then from
-// nodeA, we go up 2 ancestors (nodeA to rack0; and then from rack0 to
-// datacenter0) to get to datacenter0.  The datacenter0 has leaves of
-// nodeA, nodeB, nodeC, nodeD, so that's the inclusion candidate set.
-// But, with ExcludeLevel of 1, that means we go up 1 parent from
-// nodeA to rack0, take rack0's leaves, giving us an exclusion set of
-// nodeA & nodeB.  The inclusion candidate set minus the exclusion set
-// finally gives us just nodeC & nodeD as our final candidate nodes.
-// That final candidate set of nodes (nodeC & nodeD), of note, are not
-// on the same rack as nodeA.
+// If IncludeLevel is 1, that means go up 1 parent (so, from nodeA up
+// to rack0) and then take all of rack0's leaves: nodeA and nodeB.
+// So, the candidate nodes of nodeA and nodeB are all on the same rack
+// as nodeA.  If instead the IncludeLevel was 2 and ExcludeLevel was
+// 1, then from nodeA, we go up 2 ancestors (from nodeA to rack0; and
+// then from rack0 to datacenter0) to get to datacenter0.  The
+// datacenter0 has leaves of nodeA, nodeB, nodeC, nodeD, so that's the
+// inclusion candidate set.  But, with ExcludeLevel of 1, that means
+// we go up 1 parent from nodeA to rack0, take rack0's leaves, giving
+// us an exclusion set of nodeA & nodeB.  The inclusion candidate set
+// minus the exclusion set finally gives us just nodeC & nodeD as our
+// final candidate nodes.  That final candidate set of nodes (nodeC &
+// nodeD), of note, are not on the same rack as nodeA.
 type HierarchyRule struct {
 	// IncludeLevel defines how many parents or ancestors to traverse
 	// upwards in a containment hierarchy to find candidate nodes.
