@@ -19,7 +19,7 @@ import (
 
 func planNextMap(
 	prevMap PartitionMap,
-	nodes []string,
+	nodesAll []string,
 	nodesToRemove []string,
 	nodesToAdd []string,
 	model PartitionModel,
@@ -32,7 +32,7 @@ func planNextMap(
 ) (PartitionMap, []string) {
 	warnings := []string{}
 
-	nodesNext := StringsRemoveStrings(nodes, nodesToRemove)
+	nodesNext := StringsRemoveStrings(nodesAll, nodesToRemove)
 
 	hierarchyChildren := mapParentsToMapChildren(nodeHierarchy)
 
