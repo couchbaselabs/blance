@@ -10,12 +10,12 @@
 //  governing permissions and limitations under the License.
 
 // Package blance provides a partition assignment library, using a
-// greedy, heuristic, functional approach.  It supports multiple
-// partition states (master, replica, read-only, etc), multi-level
-// containment hierarchy (shelf/rack/zone/datacenter awareness) with
-// configurable inclusion/exclusion policies, heterogeneous partition
-// weights, heterogeneous node weights, partition stickiness control,
-// and multi-master support.
+// greedy, heuristic, functional approach.  It supports multiple,
+// user-configurable partition states (master, replica, read-only,
+// etc), multi-level containment hierarchy (shelf/rack/zone/datacenter
+// awareness) with configurable inclusion/exclusion policies,
+// heterogeneous partition weights, heterogeneous node weights,
+// partition stickiness control, and multi-master support.
 package blance
 
 // A PartitionMap represents all the partitions for some logical
