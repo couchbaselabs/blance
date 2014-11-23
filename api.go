@@ -47,14 +47,15 @@ type PartitionModelState struct {
 	// as "master" Priority of 0 and "slave" priority of 1.
 	Priority int
 
-	// A Constraint defines how many nodes the rebalancing algorithm
-	// strives to assign a partition.  For example, for any given
-	// partition, perhaps the application wants a 1 node to have
-	// "master" state and wants 2 nodes to have "slave" state.  So
-	// "master" has Contraints of 1, and "slave" has Constraints of 2.
-	// Continuing the example, when "master" state has Priority of 0
-	// and "slave" state has Priority of 1, then "master" partitions
-	// will be assigned to nodes before "slave" partitions.
+	// A Constraint defines how many nodes the algorithm strives to
+	// assign a partition.  For example, for any given partition,
+	// perhaps the application wants 1 node to have "master" state and
+	// wants 2 nodes to have "slave" state.  That is, the "master"
+	// state has Contraints of 1, and the "slave" state has
+	// Constraints of 2.  Continuing the example, when the "master"
+	// state has Priority of 0 and the "slave" state has Priority of
+	// 1, then "master" partitions will be assigned to nodes before
+	// "slave" partitions.
 	Constraints int
 }
 
@@ -66,7 +67,7 @@ type PartitionModelState struct {
 // {"slave":[{IncludeLevel:1,ExcludeLevel:0},
 // {IncludeLevel:2,ExcludeLevel:1}]}, which means assign the first
 // slave same as above, but assign the second slave to a node that is
-// not a sibling of the master (not the same parent, so different
+// not a sibling of the master (not the same parent, so to a different
 // rack).
 type HierarchyRules map[string][]*HierarchyRule
 
@@ -78,16 +79,18 @@ type HierarchyRules map[string][]*HierarchyRule
 // If IncludeLevel is 1, that means go up 1 parent (so, from nodeA up
 // to rack0) and then take all of rack0's leaves: nodeA and nodeB.
 // So, the candidate nodes of nodeA and nodeB are all on the same rack
-// as nodeA.  If instead the IncludeLevel was 2 and ExcludeLevel was
-// 1, then from nodeA, we go up 2 ancestors (from nodeA to rack0; and
-// then from rack0 to datacenter0) to get to datacenter0.  The
-// datacenter0 has leaves of nodeA, nodeB, nodeC, nodeD, so that's the
-// inclusion candidate set.  But, with ExcludeLevel of 1, that means
-// we go up 1 parent from nodeA to rack0, take rack0's leaves, giving
-// us an exclusion set of nodeA & nodeB.  The inclusion candidate set
-// minus the exclusion set finally gives us just nodeC & nodeD as our
-// final candidate nodes.  That final candidate set of nodes (nodeC &
-// nodeD), of note, are not on the same rack as nodeA.
+// as nodeA, or a "same rack" policy.  If instead the IncludeLevel was
+// 2 and ExcludeLevel was 1, then that means a "different rack"
+// policy.  With IncludeLevel of 2, we go up 2 ancestors from node A
+// (from nodeA to rack0; and then from rack0 to datacenter0) to get to
+// datacenter0.  The datacenter0 has leaves of nodeA, nodeB, nodeC,
+// nodeD, so those nodes comprise the inclusion candidate set.  But,
+// with ExcludeLevel of 1, that means we go up 1 parent from nodeA to
+// rack0, take rack0's leaves, giving us an exclusion set of nodeA &
+// nodeB.  The inclusion candidate set minus the exclusion set finally
+// gives us just nodeC & nodeD as our final candidate nodes.  That
+// final candidate set of nodes (just nodeC & nodeD) are from a
+// different rack as nodeA.
 type HierarchyRule struct {
 	// IncludeLevel defines how many parents or ancestors to traverse
 	// upwards in a containment hierarchy to find candidate nodes.
