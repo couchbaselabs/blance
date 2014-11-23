@@ -52,22 +52,50 @@ type PartitionModelState struct {
 	// partition, perhaps the application wants a 1 node to have
 	// "master" state and wants 2 nodes to have "slave" state.  So
 	// "master" has Contraints of 1, and "slave" has Constraints of 2.
+	// Continuing the example, when "master" state has Priority of 0
+	// and "slave" state has Priority of 1, then "master" partitions
+	// will be assigned to nodes before "slave" partitions.
 	Constraints int
 }
 
 // HierarchyRules example:
-// {"slave":[{IncludeLevel:1,ExcludeLevel:0}]}.
-// Another example:
+// {"slave":[{IncludeLevel:1,ExcludeLevel:0}]}, which means that after
+// a partition is assigned to a node as master, then assign the first
+// slave to a node that is a close sibling node to the master node
+// (e.g., same parent or same rack).  Another example:
 // {"slave":[{IncludeLevel:1,ExcludeLevel:0},
-//           {IncludeLevel:2,ExcludeLevel:1}]}.
+// {IncludeLevel:2,ExcludeLevel:1}]}, which means assign the first
+// slave same as above, but assign the second slave to a node that is
+// not a sibling of the master (not the same parent, so different
+// rack).
 type HierarchyRules map[string][]*HierarchyRule
 
+// A HierarchyRule is metadata for rack/zone awareness features.
+// First, IncludeLevel is processed to find a set of candidate nodes.
+// Then, ExcludeLevel is processed to remove or exclude nodes from
+// that set.  For example, for this containment tree: (datacenter0
+// (rack0 (nodeA nodeB)) (rack1 (nodeC nodeD))), then lets focus on
+// nodeA.  If IncludeLevel is 1 then, that means go up 1 parent (so,
+// rack0) and take all the leaves: nodeA nodeB.  So, the candidate
+// nodes are all on the same rack as nodeA.  If IncludeLevel was 2 and
+// ExcludeLevel was 1, then from nodeA, we go up 2 ancestors to get to
+// datacenter0.  The datacenter0 has leaves of nodeA, nodeB, nodeC,
+// nodeD, so that's are inclusing candidate set.  But, with
+// ExcludeLevel of 1, that means we have to exclude nodeA & nodeB,
+// leaving just nodeC & nodeD as our final candidate nodes.  And,
+// finally, those candidate nodes are not on the same rack as nodeA.
 type HierarchyRule struct {
+	// IncludeLevel defines how many parents or ancestors to traverse
+	// upwards in a containment hierarchy to find candidate nodes.
 	IncludeLevel int
+
+	// ExcludeLevel defines how many parents or ancestors to traverse
+	// upwards in a containment hierarchy to find an exclusion set of nodes.
 	ExcludeLevel int
 }
 
-// PlanNextMap is the main entry point.
+// PlanNextMap is the main entry point to the algorithm to assign
+// partitions to nodes.
 func PlanNextMap(
 	prevMap PartitionMap,
 	nodes []string, // Union of nodesToRemove, nodesToAdd and non-changing nodes.

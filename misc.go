@@ -24,8 +24,9 @@ func StringsToMap(strsArr []string) map[string]bool {
 	return strs
 }
 
-// StringsRemoveStrings returns a copy of stringArr, but with some
-// strings removed, keeping the same order as stringArr.
+// StringsRemoveStrings returns a copy of stringArr, but with any
+// strings from removeArr removed, keeping the same order as
+// stringArr.  So, stringArr subtract removeArr.
 func StringsRemoveStrings(stringArr, removeArr []string) []string {
 	removeMap := StringsToMap(removeArr)
 	rv := make([]string, 0, len(stringArr))
