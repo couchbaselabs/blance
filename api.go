@@ -103,10 +103,36 @@ type HierarchyRule struct {
 }
 
 // PlanNextMap is the main entry point to the algorithm to assign
-// partitions to nodes.
+// partitions to nodes.  The prevMap must at least define the
+// partitions.  Partitions must be stable between PlanNextMap() runs.
+// That is, splitting and merging or partitions are an orthogonal
+// concern and must be done separately than PlanNextMap() invocations.
+// The nodeAll parameters is all nodes (union of existing nodes, nodes
+// to be added, nodes to be removed, nodes that aren't changing).  The
+// nodesToRemove may be empty.  The nodesToAdd may be empty.  When
+// both nodesToRemove and nodesToAdd are empty, partitioning
+// assignment may still change, as another PlanNextMap() invocation
+// may reach more stabilization or balanced'ness.  The model is
+// required.  The modelStateContraints is optional, and allows the
+// caller to override the contrainsts defined in the model.  The
+// modelStateContrains is keyed by stateName (like "master", "slave",
+// etc).  The partitionWeights is optional and is keyed by
+// partitionName; it allows the caller to specify that some partitions
+// are bigger than others (e.g., California has more records than
+// Hawaii); default partitionWeight is 1.  The stateStickiness is
+// optional and is keyed by stateName; it allows the caller to prefer
+// not moving data at the tradeoff of potentially more imbalance;
+// default stateStickiness is 1.5.  The nodeWeights is optional and is
+// keyed by node name; it allows the caller to specify that some nodes
+// can hold more partitions than other nodes; default nodeWeight is 1.
+// The nodeHierarchy is optional; it defines the parent relationships
+// per node; it is keyed by node and a value is the node's parent.
+// The hierarchyRules is optional and allows the caller to define
+// slave placement policy (e.g., same/different rack; same/different
+// zone; etc).
 func PlanNextMap(
 	prevMap PartitionMap,
-	nodes []string, // Union of nodesToRemove, nodesToAdd and non-changing nodes.
+	nodesAll []string, // Union of nodesToRemove, nodesToAdd and non-changing nodes.
 	nodesToRemove []string,
 	nodesToAdd []string,
 	model PartitionModel,
@@ -118,7 +144,7 @@ func PlanNextMap(
 	hierarchyRules HierarchyRules,
 ) (nextMap PartitionMap, warnings []string) {
 	return planNextMap(prevMap,
-		nodes, nodesToRemove, nodesToAdd,
+		nodesAll, nodesToRemove, nodesToAdd,
 		model, modelStateConstraints,
 		partitionWeights,
 		stateStickiness,
