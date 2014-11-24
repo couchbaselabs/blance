@@ -2013,3 +2013,118 @@ func TestPlanNextMapHierarchy(t *testing.T) {
 	}
 	testVisTestCases(t, tests)
 }
+
+func TestMultiMaster(t *testing.T) {
+	partitionModel2Master0Slave := PartitionModel{
+		"master": &PartitionModelState{
+			Priority: 0, Constraints: 2,
+		},
+	}
+	tests := []VisTestCase{
+		{
+			About: "1 node",
+			FromTo: [][]string{
+				//            a
+				[]string{"", "m"},
+				[]string{"", "m"},
+				[]string{"", "m"},
+				[]string{"", "m"},
+				[]string{"", "m"},
+				[]string{"", "m"},
+				[]string{"", "m"},
+				[]string{"", "m"},
+			},
+			Nodes:          []string{"a"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"a"},
+			Model:          partitionModel2Master0Slave,
+			expNumWarnings: 8,
+		},
+		{
+			// TODO: This seems like a bad layout.
+			About: "4 nodes",
+			FromTo: [][]string{
+				//            abcd
+				[]string{"", "mm  "},
+				[]string{"", "  mm"},
+				[]string{"", "mm  "},
+				[]string{"", "  mm"},
+				[]string{"", "mm  "},
+				[]string{"", "  mm"},
+				[]string{"", "mm  "},
+				[]string{"", "  mm"},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"a", "b", "c", "d"},
+			Model:          partitionModel2Master0Slave,
+			expNumWarnings: 0,
+		},
+		{
+			About: "4 node stability",
+			FromTo: [][]string{
+				//        abcd
+				[]string{"mm  ", "mm  "},
+				[]string{"  mm", "  mm"},
+				[]string{"mm  ", "mm  "},
+				[]string{"  mm", "  mm"},
+				[]string{"mm  ", "mm  "},
+				[]string{"  mm", "  mm"},
+				[]string{"mm  ", "mm  "},
+				[]string{"  mm", "  mm"},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"a", "b", "c", "d"},
+			Model:          partitionModel2Master0Slave,
+			expNumWarnings: 0,
+		},
+		{
+			// TODO: Test harness isn't powerful enough to encode this case
+			// of [c,d] versus [d,c].
+			Ignore: true,
+			About:  "4 node remove 1 node",
+			FromTo: [][]string{
+				//        abcd    abcd
+				[]string{"mm  ", " mm "},
+				[]string{"  mm", "  mm"},
+				[]string{"mm  ", " m m"},
+				[]string{"  mm", "  mm"},
+				[]string{"mm  ", " mm "},
+				[]string{"  mm", " mm "},
+				[]string{"mm  ", " m m"},
+				// TODO: result is [d,c], but expected can only say [c,d].
+				[]string{"  mm", "  mm"},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{"a"},
+			NodesToAdd:     []string{},
+			Model:          partitionModel2Master0Slave,
+			expNumWarnings: 0,
+		},
+		{
+			// TODO: Test harness isn't powerful enough to encode this case
+			// of [b,d] versus [d,b].
+			Ignore: true,
+			About:  "4 node remove 2 nodes",
+			FromTo: [][]string{
+				//        abcd    abcd
+				[]string{"mm  ", " m m"},
+				[]string{"  mm", " m m"},
+				[]string{"mm  ", " m m"},
+				[]string{"  mm", " m m"},
+				[]string{"mm  ", " m m"},
+				[]string{"  mm", " m m"},
+				[]string{"mm  ", " m m"},
+				// TODO: result is [d,c], but expected can only say [c,d].
+				[]string{"  mm", "  mm"},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{"a", "c"},
+			NodesToAdd:     []string{},
+			Model:          partitionModel2Master0Slave,
+			expNumWarnings: 0,
+		},
+	}
+	testVisTestCases(t, tests)
+}
