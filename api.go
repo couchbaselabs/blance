@@ -30,12 +30,12 @@ type PartitionMap map[string]*Partition // Keyed by Partition.Name.
 // shard) of some logical resource.
 type Partition struct {
 	// The Name of a Partition must be unique within a PartitionMap.
-	Name string
+	Name string `json:"name"`
 
 	// NodesByState is keyed is stateName, and value is an array of
 	// node names.  For example, {"master": ["a"], "replica": ["b",
 	// "c"]}.
-	NodesByState map[string][]string
+	NodesByState map[string][]string `json:"nodesByState"`
 }
 
 // A PartitionModel lets applications define different states for each
@@ -50,7 +50,7 @@ type PartitionModelState struct {
 	// Priority of zero is the highest.  e.g., "master" Priority
 	// should be < than "slave" Priority, so we can define that
 	// as "master" Priority of 0 and "slave" priority of 1.
-	Priority int
+	Priority int `json:"priority"`
 
 	// A Constraint defines how many nodes the algorithm strives to
 	// assign a partition.  For example, for any given partition,
@@ -61,7 +61,7 @@ type PartitionModelState struct {
 	// state has Priority of 0 and the "slave" state has Priority of
 	// 1, then "master" partitions will be assigned to nodes before
 	// "slave" partitions.
-	Constraints int
+	Constraints int `json:"constraints"`
 }
 
 // HierarchyRules example:
@@ -99,12 +99,12 @@ type HierarchyRules map[string][]*HierarchyRule
 type HierarchyRule struct {
 	// IncludeLevel defines how many parents or ancestors to traverse
 	// upwards in a containment hierarchy to find candidate nodes.
-	IncludeLevel int
+	IncludeLevel int `json:"includeLevel"`
 
 	// ExcludeLevel defines how many parents or ancestors to traverse
 	// upwards in a containment hierarchy to find an exclusion set of
 	// nodes.
-	ExcludeLevel int
+	ExcludeLevel int `json:"excludeLevel"`
 }
 
 // PlanNextMap is the main entry point to the algorithm to assign
