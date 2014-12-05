@@ -1502,6 +1502,7 @@ type VisTestCase struct {
 	Ignore                bool
 	About                 string
 	FromTo                [][]string
+	FromToPriority        bool
 	Nodes                 []string
 	NodesToRemove         []string
 	NodesToAdd            []string
@@ -1513,6 +1514,25 @@ type VisTestCase struct {
 	NodeHierarchy         map[string]string
 	HierarchyRules        HierarchyRules
 	expNumWarnings        int
+}
+
+type fromToCell struct {
+	entry    string
+	nodeName string
+}
+
+type fromToCells []*fromToCell
+
+func (pms fromToCells) Len() int {
+	return len(pms)
+}
+
+func (pms fromToCells) Less(i, j int) bool {
+	return pms[i].entry < pms[j].entry
+}
+
+func (pms fromToCells) Swap(i, j int) {
+	pms[i], pms[j] = pms[j], pms[i]
 }
 
 func testVisTestCases(t *testing.T, tests []VisTestCase) {
@@ -1534,17 +1554,29 @@ func testVisTestCases(t *testing.T, tests []VisTestCase) {
 			partitionName := fmt.Sprintf("%d", i)
 			from := partitionFromTo[0]
 			to := partitionFromTo[1]
+			cellLength := 1
+			if c.FromToPriority {
+				cellLength = 2
+			}
 
 			partition := &Partition{
 				Name:         partitionName,
 				NodesByState: map[string][]string{},
 			}
 			prevMap[partitionName] = partition
-			for j := 0; j < len(from); j++ {
-				stateName := stateNames[from[j:j+1]]
+			row := fromToCells{}
+			for j := 0; j < len(from); j = j + cellLength {
+				row = append(row, &fromToCell{
+					entry:    from[j:j+cellLength],
+					nodeName: nodeNames[j/cellLength],
+				})
+			}
+			sort.Sort(row)
+			for _, cell := range row {
+				stateName := stateNames[cell.entry[0:1]]
 				if stateName != "" {
 					partition.NodesByState[stateName] =
-						append(partition.NodesByState[stateName], nodeNames[j])
+						append(partition.NodesByState[stateName], cell.nodeName)
 				}
 			}
 
@@ -1553,11 +1585,19 @@ func testVisTestCases(t *testing.T, tests []VisTestCase) {
 				NodesByState: map[string][]string{},
 			}
 			expMap[partitionName] = partition
-			for j := 0; j < len(to); j++ {
-				stateName := stateNames[to[j:j+1]]
+			row = fromToCells{}
+			for j := 0; j < len(to); j = j + cellLength {
+				row = append(row, &fromToCell{
+					entry:    to[j:j+cellLength],
+					nodeName: nodeNames[j/cellLength],
+				})
+			}
+			sort.Sort(row)
+			for _, cell := range row {
+				stateName := stateNames[cell.entry[0:1]]
 				if stateName != "" {
 					partition.NodesByState[stateName] =
-						append(partition.NodesByState[stateName], nodeNames[j])
+						append(partition.NodesByState[stateName], cell.nodeName)
 				}
 			}
 		}
@@ -2123,6 +2163,40 @@ func TestMultiMaster(t *testing.T) {
 			NodesToRemove:  []string{"a", "c"},
 			NodesToAdd:     []string{},
 			Model:          partitionModel2Master0Slave,
+			expNumWarnings: 0,
+		},
+	}
+	testVisTestCases(t, tests)
+}
+
+func Test2Slaves(t *testing.T) {
+	partitionModel1Master2Slave := PartitionModel{
+		"master": &PartitionModelState{
+			Priority: 0, Constraints: 1,
+		},
+		"slave": &PartitionModelState{
+			Priority: 1, Constraints: 2,
+		},
+	}
+	tests := []VisTestCase{
+		{
+			About: "1 master, 2 slaves, from 0 to 4 nodes",
+			FromTo: [][]string{
+				//            a b c d
+				[]string{"", "m0s0s1  "},
+				[]string{"", "s0m0  s1"},
+				[]string{"", "s0s1m0  "},
+				[]string{"", "s1  s0m0"},
+				[]string{"", "m0s1  s0"},
+				[]string{"", "  m0s0s1"},
+				[]string{"", "s1  m0s0"},
+				[]string{"", "  s0s1m0"},
+			},
+			FromToPriority: true,
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"a", "b", "c", "d"},
+			Model:          partitionModel1Master2Slave,
 			expNumWarnings: 0,
 		},
 	}
