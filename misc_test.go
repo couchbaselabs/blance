@@ -67,6 +67,7 @@ func TestStringsIntersectStrings(t *testing.T) {
 		{[]string{"a", "b", "c"}, []string{"a", "b", "c"}, []string{"a", "b", "c"}},
 		{[]string{"a", "b", "c"}, []string{"b", "c"}, []string{"b", "c"}},
 		{[]string{"a", "b", "c"}, []string{"c", "c"}, []string{"c"}},
+		{[]string{"a", "b", "a", "b"}, []string{"a", "b"}, []string{"a", "b"}},
 	}
 	for i, c := range tests {
 		r := StringsIntersectStrings(c.a, c.b)
