@@ -1567,7 +1567,7 @@ func testVisTestCases(t *testing.T, tests []VisTestCase) {
 			row := fromToCells{}
 			for j := 0; j < len(from); j = j + cellLength {
 				row = append(row, &fromToCell{
-					entry:    from[j:j+cellLength],
+					entry:    from[j : j+cellLength],
 					nodeName: nodeNames[j/cellLength],
 				})
 			}
@@ -1588,7 +1588,7 @@ func testVisTestCases(t *testing.T, tests []VisTestCase) {
 			row = fromToCells{}
 			for j := 0; j < len(to); j = j + cellLength {
 				row = append(row, &fromToCell{
-					entry:    to[j:j+cellLength],
+					entry:    to[j : j+cellLength],
 					nodeName: nodeNames[j/cellLength],
 				})
 			}
@@ -2175,7 +2175,7 @@ func Test2Slaves(t *testing.T) {
 	}
 	tests := []VisTestCase{
 		{
-			About: "1 master, 2 slaves, from 0 to 4 nodes",
+			About: "8 partitions, 1 master, 2 slaves, from 0 to 4 nodes",
 			FromTo: [][]string{
 				//            a b c d
 				[]string{"", "m0s0s1  "},
@@ -2195,7 +2195,7 @@ func Test2Slaves(t *testing.T) {
 			expNumWarnings: 0,
 		},
 		{
-			About: "reconverge 1 master, 2 slaves, from 4 to 4 nodes",
+			About: "8 partitions, reconverge 1 master, 2 slaves, from 4 to 4 nodes",
 			FromTo: [][]string{
 				//        a b c d     a b c d
 				[]string{"m0s0s1  ", "m0s0s1  "},
@@ -2206,6 +2206,44 @@ func Test2Slaves(t *testing.T) {
 				[]string{"  m0s0s1", "  m0s0s1"},
 				[]string{"s1  m0s0", "s1  m0s0"},
 				[]string{"  s0s1m0", "  s0s1m0"},
+			},
+			FromToPriority: true,
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{},
+			Model:          partitionModel1Master2Slave,
+			expNumWarnings: 0,
+		},
+		{ // Try case where number of nodes isn't a factor of # partitions.
+			About: "7 partitions, 1 master, 2 slaves, from 0 to 4 nodes",
+			FromTo: [][]string{
+				//            a b c d
+				[]string{"", "m0s0  s1"},
+				[]string{"", "s1m0s0  "},
+				[]string{"", "s1  m0s0"},
+				[]string{"", "  s0s1m0"},
+				[]string{"", "m0  s0s1"},
+				[]string{"", "s1m0  s0"},
+				[]string{"", "s1s0m0  "},
+			},
+			FromToPriority: true,
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"a", "b", "c", "d"},
+			Model:          partitionModel1Master2Slave,
+			expNumWarnings: 0,
+		},
+		{
+			About: "7 partitions, reconverge 1 master, 2 slaves, from 4 to 4 nodes",
+			FromTo: [][]string{
+				//        a b c d     a b c d
+				[]string{"m0s0  s1", "m0s0  s1"},
+				[]string{"s1m0s0  ", "s1m0s0  "},
+				[]string{"s1  m0s0", "s1  m0s0"},
+				[]string{"  s0s1m0", "  s0s1m0"},
+				[]string{"m0  s0s1", "m0  s0s1"},
+				[]string{"s1m0  s0", "s1m0  s0"},
+				[]string{"s1s0m0  ", "s1s0m0  "},
 			},
 			FromToPriority: true,
 			Nodes:          []string{"a", "b", "c", "d"},
