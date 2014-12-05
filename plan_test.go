@@ -1551,7 +1551,7 @@ func testVisTestCases(t *testing.T, tests []VisTestCase) {
 		prevMap := PartitionMap{}
 		expMap := PartitionMap{}
 		for i, partitionFromTo := range c.FromTo {
-			partitionName := fmt.Sprintf("%d", i)
+			partitionName := fmt.Sprintf("%03d", i)
 			from := partitionFromTo[0]
 			to := partitionFromTo[1]
 			cellLength := 1
@@ -2210,11 +2210,66 @@ func Test2Slaves(t *testing.T) {
 			FromToPriority: true,
 			Nodes:          []string{"a", "b", "c", "d"},
 			NodesToRemove:  []string{},
+			NodesToAdd:     []string{},
+			Model:          partitionModel1Master2Slave,
+			expNumWarnings: 0,
+		},
+		{
+			About: "16 partitions, 1 master, 2 slaves, from 0 to 4 nodes",
+			FromTo: [][]string{
+				//            a b c d
+				[]string{"", "m0s0s1  "},
+				[]string{"", "s0m0  s1"},
+				[]string{"", "  s0m0s1"},
+				[]string{"", "s0  s1m0"},
+				[]string{"", "m0s1  s0"},
+				[]string{"", "  m0s0s1"},
+				[]string{"", "s0  m0s1"},
+				[]string{"", "  s0s1m0"},
+				[]string{"", "m0  s0s1"},
+				[]string{"", "s0m0s1  "},
+				[]string{"", "  s0m0s1"},
+				[]string{"", "s0s1  m0"},
+				[]string{"", "m0s0s1  "},
+				[]string{"", "s0m0  s1"},
+				[]string{"", "s0s1m0  "},
+				[]string{"", "s0  s1m0"},
+			},
+			FromToPriority: true,
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
 			NodesToAdd:     []string{"a", "b", "c", "d"},
 			Model:          partitionModel1Master2Slave,
 			expNumWarnings: 0,
 		},
-
+		{
+			About: "re-feed 16 partitions, 1 master, 2 slaves, from 4 to 4 nodes",
+			FromTo: [][]string{
+				//        a b c d     a b c d
+				[]string{"m0s0s1  ", "m0s0s1  "},
+				[]string{"s0m0  s1", "s0m0  s1"},
+				[]string{"  s0m0s1", "  s0m0s1"},
+				[]string{"s0  s1m0", "s0  s1m0"},
+				[]string{"m0s1  s0", "m0s1  s0"},
+				[]string{"  m0s0s1", "  m0s0s1"},
+				[]string{"s0  m0s1", "s0  m0s1"},
+				[]string{"  s0s1m0", "  s0s1m0"},
+				[]string{"m0  s0s1", "m0  s0s1"},
+				[]string{"s0m0s1  ", "s0m0s1  "},
+				[]string{"  s0m0s1", "  s0m0s1"},
+				[]string{"s0s1  m0", "s0s1  m0"},
+				[]string{"m0s0s1  ", "m0s0s1  "},
+				[]string{"s0m0  s1", "s0m0  s1"},
+				[]string{"s0s1m0  ", "s0s1m0  "},
+				[]string{"s0  s1m0", "s0  s1m0"},
+			},
+			FromToPriority: true,
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{},
+			Model:          partitionModel1Master2Slave,
+			expNumWarnings: 0,
+		},
 	}
 	testVisTestCases(t, tests)
 }
