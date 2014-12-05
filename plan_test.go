@@ -1013,7 +1013,7 @@ func TestPlanNextMap(t *testing.T) {
 				"0": &Partition{
 					Name: "0",
 					NodesByState: map[string][]string{
-						"master": []string{"a", "b"},
+						"master": []string{"b", "a"},
 						"slave":  []string{"c"},
 					},
 				},
@@ -1735,9 +1735,6 @@ func TestPlanNextMapVis(t *testing.T) {
 			expNumWarnings: 0,
 		},
 		{
-			// ISSUE: Looks like node b is assigned too many slaves?
-			// Re-running the algorithm again, however, seems to
-			// stabilize (see next two cases).
 			About: "8 partitions, 1 to 4 nodes",
 			FromTo: [][]string{
 				//             abcd
@@ -1745,7 +1742,7 @@ func TestPlanNextMapVis(t *testing.T) {
 				[]string{"m", "  ms"},
 				[]string{"m", "s  m"},
 				[]string{"m", " ms "},
-				[]string{"m", " sm "},
+				[]string{"m", "  ms"},
 				[]string{"m", " s m"},
 				[]string{"m", "ms  "},
 				[]string{"m", "m s "},
@@ -1757,8 +1754,6 @@ func TestPlanNextMapVis(t *testing.T) {
 			expNumWarnings: 0,
 		},
 		{
-			// Take output from previous case and use as input to this
-			// case to see that it reached even more balanced'ness.
 			About: "8 partitions, 4 nodes don't change, 1 slave moved",
 			FromTo: [][]string{
 				//        abcd    abcd
@@ -2186,7 +2181,7 @@ func Test2Slaves(t *testing.T) {
 				[]string{"", "m0s0s1  "},
 				[]string{"", "s0m0  s1"},
 				[]string{"", "s0s1m0  "},
-				[]string{"", "s1  s0m0"},
+				[]string{"", "s0  s1m0"},
 				[]string{"", "m0s1  s0"},
 				[]string{"", "  m0s0s1"},
 				[]string{"", "s1  m0s0"},
@@ -2199,6 +2194,27 @@ func Test2Slaves(t *testing.T) {
 			Model:          partitionModel1Master2Slave,
 			expNumWarnings: 0,
 		},
+		{
+			About: "reconverge 1 master, 2 slaves, from 4 to 4 nodes",
+			FromTo: [][]string{
+				//        a b c d     a b c d
+				[]string{"m0s0s1  ", "m0s0s1  "},
+				[]string{"s0m0  s1", "s0m0  s1"},
+				[]string{"s0s1m0  ", "s0s1m0  "},
+				[]string{"s1  s0m0", "s0  s1m0"}, // Flipped slaves reconverges.
+				[]string{"m0s1  s0", "m0s1  s0"},
+				[]string{"  m0s0s1", "  m0s0s1"},
+				[]string{"s1  m0s0", "s1  m0s0"},
+				[]string{"  s0s1m0", "  s0s1m0"},
+			},
+			FromToPriority: true,
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{"a", "b", "c", "d"},
+			Model:          partitionModel1Master2Slave,
+			expNumWarnings: 0,
+		},
+
 	}
 	testVisTestCases(t, tests)
 }

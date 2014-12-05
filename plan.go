@@ -13,11 +13,44 @@ package blance
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 )
 
+var MaxIterationsPerPlan = 10
+
 func planNextMap(
+	prevMap PartitionMap,
+	nodesAll []string,
+	nodesToRemove []string,
+	nodesToAdd []string,
+	model PartitionModel,
+	modelStateConstraints map[string]int, // Keyed by stateName.
+	partitionWeights map[string]int, // Keyed by partitionName.
+	stateStickiness map[string]int, // Keyed by stateName.
+	nodeWeights map[string]int, // Keyed by node.
+	nodeHierarchy map[string]string, // Keyed by node, value is node's parent.
+	hierarchyRules HierarchyRules,
+) (nextMap PartitionMap, warnings []string) {
+	for i := 0; i < MaxIterationsPerPlan; i++ { // Loop for convergence.
+		nextMap, warnings = planNextMapInner(prevMap,
+			nodesAll, nodesToRemove, nodesToAdd,
+			model, modelStateConstraints,
+			partitionWeights, stateStickiness, nodeWeights,
+			nodeHierarchy, hierarchyRules)
+		if reflect.DeepEqual(nextMap, prevMap) {
+			break
+		}
+		prevMap = nextMap
+		nodesAll = StringsRemoveStrings(nodesAll, nodesToRemove)
+		nodesToRemove = []string{}
+		nodesToAdd = []string{}
+	}
+	return nextMap, warnings
+}
+
+func planNextMapInner(
 	prevMap PartitionMap,
 	nodesAll []string,
 	nodesToRemove []string,
