@@ -18,6 +18,9 @@ import (
 	"strconv"
 )
 
+// MaxIterationsPerPlan controls how many iterations blance will
+// attempt to try to converge to a stabilized plan.  Usually, blance
+// only needs only 1 or 2 iterations.
 var MaxIterationsPerPlan = 10
 
 func planNextMap(
