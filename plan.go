@@ -598,7 +598,7 @@ func (ns *nodeSorter) Score(i int) float64 {
 // map keeyed by node, value is array of child nodes.
 func mapParentsToMapChildren(mapParents map[string]string) map[string][]string {
 	nodes := make([]string, 0) // Sort for stability.
-	for node, _ := range mapParents {
+	for node := range mapParents {
 		nodes = append(nodes, node)
 	}
 	sort.Strings(nodes)
