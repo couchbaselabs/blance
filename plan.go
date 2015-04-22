@@ -206,7 +206,7 @@ func planNextMapInner(
 			candidateNodes = candidateNodes[0:constraints]
 		} else {
 			warnings = append(warnings,
-				fmt.Sprintf("could not meet contraints: %d,"+
+				fmt.Sprintf("could not meet constraints: %d,"+
 					" stateName: %s, partitionName: %s",
 					constraints, stateName, partition.Name))
 		}

@@ -56,7 +56,7 @@ type PartitionModelState struct {
 	// assign a partition.  For example, for any given partition,
 	// perhaps the application wants 1 node to have "master" state and
 	// wants 2 nodes to have "slave" state.  That is, the "master"
-	// state has Contraints of 1, and the "slave" state has
+	// state has Constraints of 1, and the "slave" state has
 	// Constraints of 2.  Continuing the example, when the "master"
 	// state has Priority of 0 and the "slave" state has Priority of
 	// 1, then "master" partitions will be assigned to nodes before
@@ -118,9 +118,9 @@ type HierarchyRule struct {
 // both nodesToRemove and nodesToAdd are empty, partitioning
 // assignment may still change, as another PlanNextMap() invocation
 // may reach more stabilization or balanced'ness.  The model is
-// required.  The modelStateContraints is optional, and allows the
-// caller to override the contrainsts defined in the model.  The
-// modelStateContrains is keyed by stateName (like "master", "slave",
+// required.  The modelStateConstraints is optional, and allows the
+// caller to override the constraints defined in the model.  The
+// modelStateConstraints is keyed by stateName (like "master", "slave",
 // etc).  The partitionWeights is optional and is keyed by
 // partitionName; it allows the caller to specify that some partitions
 // are bigger than others (e.g., California has more records than
