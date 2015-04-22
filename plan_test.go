@@ -1492,7 +1492,7 @@ func TestPlanNextMap(t *testing.T) {
 				i, jc, jr, jexp)
 		}
 		if c.expNumWarnings != len(rWarnings) {
-			t.Errorf("i: %d, planNextMap.warnings, c: %#v, rWarnings: %d, expNumWarnings: %d",
+			t.Errorf("i: %d, planNextMap.warnings, c: %#v, rWarnings: %v, expNumWarnings: %d",
 				i, c, rWarnings, c.expNumWarnings)
 		}
 	}
@@ -1624,7 +1624,7 @@ func testVisTestCases(t *testing.T, tests []VisTestCase) {
 		}
 		if c.expNumWarnings != len(rWarnings) {
 			t.Errorf("i: %d, planNextMapVis.warnings, c: %#v,"+
-				" rWarnings: %d, expNumWarnings: %d",
+				" rWarnings: %v, expNumWarnings: %d",
 				i, c, rWarnings, c.expNumWarnings)
 		}
 	}
