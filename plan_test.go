@@ -8,6 +8,9 @@ import (
 	"testing"
 )
 
+// TODO: Test changing node weights.
+// TODO: Test changing partition weights.
+
 func TestflattenNodesByState(t *testing.T) {
 	tests := []struct {
 		a   map[string][]string
