@@ -9,7 +9,6 @@ import (
 )
 
 // TODO: Test changing node weights.
-// TODO: Test changing partition weights.
 
 func TestflattenNodesByState(t *testing.T) {
 	tests := []struct {
@@ -1898,6 +1897,66 @@ func TestPlanNextMapVis(t *testing.T) {
 			NodesToRemove:  []string{},
 			NodesToAdd:     []string{"b", "c", "d", "e", "f", "g", "h"},
 			Model:          partitionModel1Master0Slave,
+			expNumWarnings: 0,
+		},
+		{
+			About: "8 partitions, 4 nodes, increase partition 000 weight",
+			FromTo: [][]string{
+				//        abcd    abcd
+				[]string{"sm  ", " m s"},
+				[]string{"  ms", "s m "},
+				[]string{"s  m", "s  m"},
+				[]string{" ms ", "  sm"},
+				[]string{" sm ", " sm "},
+				[]string{" s m", " s m"},
+				[]string{"ms  ", "ms  "},
+				[]string{"m s ", "m s "},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{},
+			PartitionWeights: map[string]int{"000": 100},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
+		{
+			About: "8 partitions, 4 nodes, increase partition 004 weight",
+			FromTo: [][]string{
+				//        abcd    abcd
+				[]string{"sm  ", " m s"},
+				[]string{"  ms", " s m"},
+				[]string{"s  m", "  sm"},
+				[]string{" ms ", " m s"},
+				[]string{" sm ", "s m "},
+				[]string{" s m", " s m"},
+				[]string{"ms  ", "ms  "},
+				[]string{"m s ", "m s "},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{},
+			PartitionWeights: map[string]int{"004": 100},
+			Model:          partitionModel1Master1Slave,
+			expNumWarnings: 0,
+		},
+		{
+			About: "8 partitions, 4 nodes, increase partition 000, 004 weight",
+			FromTo: [][]string{
+				//        abcd    abcd
+				[]string{"sm  ", " m s"}, // partition 000.
+				[]string{"  ms", " s m"},
+				[]string{"s  m", "  sm"},
+				[]string{" ms ", "m s "},
+				[]string{" sm ", "s m "}, // partition 004.
+				[]string{" s m", " s m"},
+				[]string{"ms  ", "ms  "},
+				[]string{"m s ", "m s "},
+			},
+			Nodes:          []string{"a", "b", "c", "d"},
+			NodesToRemove:  []string{},
+			NodesToAdd:     []string{},
+			PartitionWeights: map[string]int{"000": 100, "004": 100},
+			Model:          partitionModel1Master1Slave,
 			expNumWarnings: 0,
 		},
 	}
