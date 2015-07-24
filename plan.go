@@ -598,7 +598,7 @@ func (ns *nodeSorter) Score(i int) float64 {
 // --------------------------------------------------------
 
 // The mapParents is keyed by node, value is parent node.  Returns a
-// map keeyed by node, value is array of child nodes.
+// map keyed by node, value is array of child nodes.
 func mapParentsToMapChildren(mapParents map[string]string) map[string][]string {
 	nodes := make([]string, 0) // Sort for stability.
 	for node := range mapParents {
