@@ -137,7 +137,7 @@ type HierarchyRule struct {
 // zone; etc).
 func PlanNextMap(
 	prevMap PartitionMap,
-	nodesAll []string, // Union of nodesToRemove, nodesToAdd and non-changing nodes.
+	nodesAll []string, // Union of nodesBefore, nodesToAdd, nodesToRemove.
 	nodesToRemove []string,
 	nodesToAdd []string,
 	model PartitionModel,

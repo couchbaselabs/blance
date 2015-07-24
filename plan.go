@@ -25,7 +25,7 @@ var MaxIterationsPerPlan = 10
 
 func planNextMap(
 	prevMap PartitionMap,
-	nodesAll []string,
+	nodesAll []string, // Union of nodesBefore, nodesToAdd, nodesToRemove.
 	nodesToRemove []string,
 	nodesToAdd []string,
 	model PartitionModel,
@@ -55,7 +55,7 @@ func planNextMap(
 
 func planNextMapInner(
 	prevMap PartitionMap,
-	nodesAll []string,
+	nodesAll []string, // Union of nodesBefore, nodesToAdd, nodesToRemove.
 	nodesToRemove []string,
 	nodesToAdd []string,
 	model PartitionModel,
@@ -77,7 +77,8 @@ func planNextMapInner(
 	nextPartitions := prevMap.toArrayCopy()
 	for _, partition := range nextPartitions {
 		partition.NodesByState =
-			removeNodesFromNodesByState(partition.NodesByState, nodesToRemove, nil)
+			removeNodesFromNodesByState(partition.NodesByState,
+				nodesToRemove, nil)
 	}
 	sort.Sort(&partitionSorter{a: nextPartitions})
 
@@ -111,7 +112,8 @@ func planNextMapInner(
 		nodePartitionCounts := make(map[string]int)
 		for _, nodeCounts := range stateNodeCounts {
 			for node, nodeCount := range nodeCounts {
-				nodePartitionCounts[node] = nodePartitionCounts[node] + nodeCount
+				nodePartitionCounts[node] =
+					nodePartitionCounts[node] + nodeCount
 			}
 		}
 
@@ -138,7 +140,8 @@ func planNextMapInner(
 		excludeHigherPriorityNodes := func(remainingNodes []string) []string {
 			for stateName, stateNodes := range partition.NodesByState {
 				if model[stateName].Priority < statePriority {
-					remainingNodes = StringsRemoveStrings(remainingNodes, stateNodes)
+					remainingNodes =
+						StringsRemoveStrings(remainingNodes, stateNodes)
 				}
 			}
 			return remainingNodes
@@ -261,7 +264,8 @@ func planNextMapInner(
 			}
 
 			nodesToAssign :=
-				findBestNodes(partition, stateName, constraints, nodeToNodeCounts)
+				findBestNodes(partition,
+					stateName, constraints, nodeToNodeCounts)
 
 			partition.NodesByState =
 				removeNodesFromNodesByState(partition.NodesByState,
@@ -496,9 +500,9 @@ func (r *partitionSorter) Score(i int) []string {
 	if r.prevMap != nil &&
 		r.nodesToRemove != nil {
 		lastPartition := r.prevMap[partitionName]
-		lastPartitionNBS := lastPartition.NodesByState[r.stateName]
-		if lastPartitionNBS != nil &&
-			len(StringsIntersectStrings(lastPartitionNBS, r.nodesToRemove)) > 0 {
+		lpnbs := lastPartition.NodesByState[r.stateName]
+		if lpnbs != nil &&
+			len(StringsIntersectStrings(lpnbs, r.nodesToRemove)) > 0 {
 			return []string{"0", partitionWeightStr, partitionNameStr}
 		}
 	}
@@ -599,7 +603,8 @@ func (ns *nodeSorter) Score(i int) float64 {
 
 // The mapParents is keyed by node, value is parent node.  Returns a
 // map keyed by node, value is array of child nodes.
-func mapParentsToMapChildren(mapParents map[string]string) map[string][]string {
+func mapParentsToMapChildren(
+	mapParents map[string]string) map[string][]string {
 	nodes := make([]string, 0) // Sort for stability.
 	for node := range mapParents {
 		nodes = append(nodes, node)
@@ -623,12 +628,16 @@ func includeExcludeNodes(node string,
 	excludeLevel int,
 	mapParents map[string]string,
 	mapChildren map[string][]string) []string {
-	incNodes := findLeaves(findAncestor(node, mapParents, includeLevel), mapChildren)
-	excNodes := findLeaves(findAncestor(node, mapParents, excludeLevel), mapChildren)
+	incNodes :=
+		findLeaves(findAncestor(node, mapParents, includeLevel), mapChildren)
+	excNodes :=
+		findLeaves(findAncestor(node, mapParents, excludeLevel), mapChildren)
+
 	return StringsRemoveStrings(incNodes, excNodes)
 }
 
-func findAncestor(node string, mapParents map[string]string, level int) string {
+func findAncestor(node string,
+	mapParents map[string]string, level int) string {
 	for level > 0 {
 		node = mapParents[node]
 		level--
