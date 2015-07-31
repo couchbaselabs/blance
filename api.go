@@ -20,10 +20,10 @@ package blance
 
 // A PartitionMap represents all the partitions for some logical
 // resource, where the partitions are assigned to different nodes and
-// with different states.  For example, partition "A...H" is assigned
-// to node "x" as a "master" and to node "y" as a "replica".  And,
-// partition "I...Z" is assigned node "y" as a "master" and to nodes
-// "z" & "x" as "replica".
+// with different states.  For example, partition "A-thru-H" is
+// assigned to node "x" as a "master" and to node "y" as a "replica".
+// And, partition "I-thru-Z" is assigned to node "y" as a "master" and
+// to nodes "z" & "x" as "replica".
 type PartitionMap map[string]*Partition // Keyed by Partition.Name.
 
 // A Partition represents a distinct, non-overlapping subset (or a
