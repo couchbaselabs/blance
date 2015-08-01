@@ -18,6 +18,8 @@ type Orchestrator struct {
 
 	options OrchestratorOptions
 
+	nodesAll []string
+
 	destMap PartitionMap
 	currMap func() (PartitionMap, error)
 
@@ -38,6 +40,7 @@ func OrchestrateMoves(
 	label string,
 	partitionModel PartitionModel,
 	options OrchestratorOptions,
+	nodesAll []string,
 	destMap PartitionMap,
 	currMap func() (PartitionMap, error),
 	assignPartition func(partition string, node string, priority int) error,
@@ -49,6 +52,7 @@ func OrchestrateMoves(
 		label:             label,
 		partitionModel:    partitionModel,
 		options:           options,
+		nodesAll:          nodesAll,
 		destMap:           destMap,
 		currMap:           currMap,
 		assignPartition:   assignPartition,
