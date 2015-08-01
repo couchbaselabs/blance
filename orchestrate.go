@@ -27,7 +27,7 @@ type Orchestrator struct {
 		state string, pct float32, err error)
 
 	progressCh chan OrchestratorProgress
-	stopCh     chan struct{}
+	controlCh  chan string
 }
 
 // OrchestratorMoves asynchronously begins reassigning partitions
@@ -55,34 +55,33 @@ func OrchestrateMoves(
 		unassignPartition: unassignPartition,
 		partitionState:    partitionState,
 		progressCh:        make(chan OrchestratorProgress),
-		stopCh:            make(chan struct{}),
+		controlCh:         make(chan string),
 	}
 
-	// TODO: Start goroutine.
+	go o.run()
 
 	return o, nil
 }
 
-// Stop asynchrnously requests the orchestrator to stop and move to
-// the done state.
+// Stop asynchronously requests the orchestrator to stop, where the
+// caller will eventually see a closed progress channel.
 func (o *Orchestrator) Stop() {
-	close(o.stopCh)
+	close(o.controlCh)
 }
 
 // ProgressCh returns a channel that is updated occassionally when the
 // orchestrator has made some progress on one or more partition
-// reassignments, or has reached an error.  The channel is closed when
-// the orchestrator is finished, either naturally, or due to an error,
-// or via a Stop(), and all the orchestrator's resources have been
-// released.
+// reassignments, or has reached an error.  The channel is closed by
+// the orchestrator when it is finished, either naturally, or due to
+// an error, or via a Stop(), and all the orchestrator's resources
+// have been released.
 func (o *Orchestrator) ProgressCh() chan OrchestratorProgress {
 	return o.progressCh
 }
 
 // PauseNewAssignments disallows the orchestrator from starting any
-// new assignments of partitions to nodes, allowing the caller to
-// throttle the concurrency of moves.  Any inflight partition moves
-// will continue to be finished.  The caller can monitor the
+// new assignments of partitions to nodes.  Any inflight partition
+// moves will continue to be finished.  The caller can monitor the
 // ProgressCh to determine when to pause and/or resume partition
 // assignments.  PauseNewAssignments is idempotent.
 func (o *Orchestrator) PauseNewAssignments() error {
@@ -106,6 +105,10 @@ type OrchestratorProgress struct {
 	TotPartitionsAssignedDone   int
 	TotPartitionsUnassigned     int
 	TotPartitionsUnassignedDone int
+}
+
+func (o *Orchestrator) run() {
+	// TODO.
 }
 
 /*
