@@ -26,12 +26,14 @@ type Orchestrator struct {
 	partitionState    func(partition string, node string) (
 		state string, pct float32, err error)
 
-	statsCh chan OrchestratorStats
-	stopCh  chan struct{}
+	progressCh chan OrchestratorProgress
+	stopCh     chan struct{}
 }
 
 // OrchestratorMoves asynchronously begins reassigning partitions
-// between nodes to reach the destMap.
+// amongst nodes to reach the destMap state, invoking the callback
+// functions like assignPartition() and unassignPartition() affect
+// changes.
 func OrchestrateMoves(
 	label string,
 	partitionModel PartitionModel,
@@ -52,7 +54,7 @@ func OrchestrateMoves(
 		assignPartition:   assignPartition,
 		unassignPartition: unassignPartition,
 		partitionState:    partitionState,
-		statsCh:           make(chan OrchestratorStats),
+		progressCh:        make(chan OrchestratorProgress),
 		stopCh:            make(chan struct{}),
 	}
 
@@ -67,21 +69,22 @@ func (o *Orchestrator) Stop() {
 	close(o.stopCh)
 }
 
-// StatsCh returns a channel that is updated occassionally when the
+// ProgressCh returns a channel that is updated occassionally when the
 // orchestrator has made some progress on one or more partition
-// reassignments.  The channel is closed when the orchestrator is
-// finished, either naturally or via a Stop(), and all the
-// orchestrator's resources have been released.
-func (o *Orchestrator) StatsCh() chan OrchestratorStats {
-	return o.statsCh
+// reassignments, or has reached an error.  The channel is closed when
+// the orchestrator is finished, either naturally, or due to an error,
+// or via a Stop(), and all the orchestrator's resources have been
+// released.
+func (o *Orchestrator) ProgressCh() chan OrchestratorProgress {
+	return o.progressCh
 }
 
 // PauseNewAssignments disallows the orchestrator from starting any
 // new assignments of partitions to nodes, allowing the caller to
 // throttle the concurrency of moves.  Any inflight partition moves
-// will continue to be finished.  The caller can monitor the StatsCh
-// to determine when to pause and/or resume partition assignments.
-// PauseNewAssignments is idempotent.
+// will continue to be finished.  The caller can monitor the
+// ProgressCh to determine when to pause and/or resume partition
+// assignments.  PauseNewAssignments is idempotent.
 func (o *Orchestrator) PauseNewAssignments() error {
 	return nil // TODO.
 }
@@ -97,7 +100,8 @@ type OrchestratorOptions struct {
 	MaxConcurrentPartitionBuildsPerNode   int
 }
 
-type OrchestratorStats struct {
+type OrchestratorProgress struct {
+	Error                       error
 	TotPartitionsAssigned       int
 	TotPartitionsAssignedDone   int
 	TotPartitionsUnassigned     int
