@@ -23,10 +23,12 @@ type Orchestrator struct {
 	destMap PartitionMap
 	currMap func() (PartitionMap, error)
 
-	assignPartition   func(partition string, node string, priority int) error
-	unassignPartition func(partition string, node string) error
-	partitionState    func(partition string, node string) (
-		state string, pct float32, err error)
+	assignPartition func(partition string, node string,
+		state string, priority int, fromNode string) error
+	unassignPartition func(partition string, node string,
+		state string, priority int) error
+	partitionState func(partition string, node string) (
+		state string, priority int, pct float32, err error)
 
 	progressCh chan OrchestratorProgress
 	controlCh  chan string
@@ -43,10 +45,12 @@ func OrchestrateMoves(
 	nodesAll []string,
 	destMap PartitionMap,
 	currMap func() (PartitionMap, error),
-	assignPartition func(partition string, node string, priority int) error,
-	unassignPartition func(partition string, node string) error,
-	partitionState func(partition string, node string) (
-		state string, pct float32, err error),
+	assignPartition func(partition, node, state string,
+		priority int, fromNode string) error,
+	unassignPartition func(partition, node, state string,
+		priority int) error,
+	partitionState func(partition, node string) (
+		state string, priority int, pct float32, err error),
 ) (*Orchestrator, error) {
 	o := &Orchestrator{
 		label:             label,
