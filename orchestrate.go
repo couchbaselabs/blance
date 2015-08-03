@@ -36,6 +36,19 @@ type Orchestrator struct {
 	tokensReleaseCh chan int
 }
 
+type OrchestratorOptions struct {
+	MaxConcurrentPartitionMovesPerCluster int
+	MaxConcurrentPartitionBuildsPerNode   int
+}
+
+type OrchestratorProgress struct {
+	Error                       error
+	TotPartitionsAssigned       int
+	TotPartitionsAssignedDone   int
+	TotPartitionsUnassigned     int
+	TotPartitionsUnassignedDone int
+}
+
 // AssignPartitionFunc is a callback invoked by OrchestrateMoves()
 // when it wants to asynchronously assign a partition to a node.
 type AssignPartitionFunc func(
@@ -95,7 +108,9 @@ func OrchestrateMoves(
 		tokensReleaseCh:   make(chan int),
 	}
 
-	go o.run()
+	go o.runTokens()
+
+	go o.runNodes()
 
 	return o, nil
 }
@@ -131,27 +146,8 @@ func (o *Orchestrator) ResumeNewAssignments() error {
 	return nil // TODO.
 }
 
-type OrchestratorOptions struct {
-	MaxConcurrentPartitionMovesPerCluster int
-	MaxConcurrentPartitionBuildsPerNode   int
-}
-
-type OrchestratorProgress struct {
-	Error                       error
-	TotPartitionsAssigned       int
-	TotPartitionsAssignedDone   int
-	TotPartitionsUnassigned     int
-	TotPartitionsUnassignedDone int
-}
-
-func (o *Orchestrator) run() {
-	nodesDoneCh := make(chan error)
-
-	for _, node := range o.nodesAll {
-		go func() {
-			nodesDoneCh <- o.runNode(node)
-		}()
-	}
+func (o *Orchestrator) runTokens() {
+	defer close(o.tokensSupplyCh)
 
 	m := o.options.MaxConcurrentPartitionMovesPerCluster
 	for i := 0; i < m; i++ {
@@ -164,9 +160,37 @@ func (o *Orchestrator) run() {
 		o.tokensSupplyCh <- i
 	}
 
+	for {
+		select {
+		case _, ok := <-o.doneCh:
+			if !ok {
+				return
+			}
+
+		case token, ok := <-o.tokensReleaseCh:
+			if !ok {
+				return
+			}
+
+			o.tokensSupplyCh <- token
+		}
+	}
+}
+
+func (o *Orchestrator) runNodes() {
+	nodesDoneCh := make(chan error)
+
+	for _, node := range o.nodesAll {
+		go func() {
+			nodesDoneCh <- o.runNode(node)
+		}()
+	}
+
 	for range o.nodesAll {
 		<-nodesDoneCh
 	}
+
+	close(o.tokensReleaseCh)
 
 	close(o.progressCh)
 }
