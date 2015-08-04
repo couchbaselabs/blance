@@ -11,6 +11,10 @@
 
 package blance
 
+import (
+	"sync"
+)
+
 // An Orchestrator instance holds the runtime state during an
 // OrchestrateMoves() operation.
 type Orchestrator struct {
@@ -30,8 +34,11 @@ type Orchestrator struct {
 	partitionState    PartitionStateFunc
 
 	progressCh chan OrchestratorProgress
-	doneCh     chan struct{}
+	doneCh     chan struct{} // Becomes nil when done.
 
+	m sync.Mutex
+
+	tokensResumeCh  chan struct{} // May be nil; non-nil when paused.
 	tokensSupplyCh  chan int
 	tokensReleaseCh chan int
 }
@@ -92,6 +99,8 @@ func OrchestrateMoves(
 	unassignPartition UnassignPartitionFunc,
 	partitionState PartitionStateFunc,
 ) (*Orchestrator, error) {
+	m := options.MaxConcurrentPartitionMovesPerCluster
+
 	o := &Orchestrator{
 		label:             label,
 		partitionModel:    partitionModel,
@@ -104,25 +113,31 @@ func OrchestrateMoves(
 		partitionState:    partitionState,
 		progressCh:        make(chan OrchestratorProgress),
 		doneCh:            make(chan struct{}),
-		tokensSupplyCh:    make(chan int),
+		tokensResumeCh:    make(chan struct{}),
+		tokensSupplyCh:    make(chan int, m),
 		tokensReleaseCh:   make(chan int),
 	}
 
-	go o.runTokens()
+	go o.runTokens(m)
 
 	go o.runNodes()
 
 	return o, nil
 }
 
-// Stop asynchronously requests the orchestrator to stop, where the
+// Stop() asynchronously requests the orchestrator to stop, where the
 // caller will eventually see a closed progress channel.
 func (o *Orchestrator) Stop() {
-	close(o.doneCh)
+	o.m.Lock()
+	if o.doneCh != nil {
+		close(o.doneCh)
+		o.doneCh = nil
+	}
+	o.m.Unlock()
 }
 
-// ProgressCh returns a channel that is updated occassionally when the
-// orchestrator has made some progress on one or more partition
+// ProgressCh() returns a channel that is updated occassionally when
+// the orchestrator has made some progress on one or more partition
 // reassignments, or has reached an error.  The channel is closed by
 // the orchestrator when it is finished, either naturally, or due to
 // an error, or via a Stop(), and all the orchestrator's resources
@@ -131,26 +146,36 @@ func (o *Orchestrator) ProgressCh() chan OrchestratorProgress {
 	return o.progressCh
 }
 
-// PauseNewAssignments disallows the orchestrator from starting any
+// PauseNewAssignments() disallows the orchestrator from starting any
 // new assignments of partitions to nodes.  Any inflight partition
 // moves will continue to be finished.  The caller can monitor the
 // ProgressCh to determine when to pause and/or resume partition
 // assignments.  PauseNewAssignments is idempotent.
 func (o *Orchestrator) PauseNewAssignments() error {
-	return nil // TODO.
+	o.m.Lock()
+	if o.tokensResumeCh == nil {
+		o.tokensResumeCh = make(chan struct{})
+	}
+	o.m.Unlock()
+	return nil
 }
 
 // ResumeNewAssignments tells the orchestrator that it may resume
 // assignments of partitions to nodes, and is idempotent.
 func (o *Orchestrator) ResumeNewAssignments() error {
+	o.m.Lock()
+	if o.tokensResumeCh != nil {
+		close(o.tokensResumeCh)
+		o.tokensResumeCh = nil
+	}
+	o.m.Unlock()
 	return nil // TODO.
 }
 
-func (o *Orchestrator) runTokens() {
+func (o *Orchestrator) runTokens(numStartTokens int) {
 	defer close(o.tokensSupplyCh)
 
-	m := o.options.MaxConcurrentPartitionMovesPerCluster
-	for i := 0; i < m; i++ {
+	for i := 0; i < numStartTokens; i++ {
 		// Tokens available to throttle concurrency.  The # of
 		// outstanding tokens might be changed dynamically and can
 		// also be used to synchronize with any optional, external
@@ -162,17 +187,29 @@ func (o *Orchestrator) runTokens() {
 
 	for {
 		select {
-		case _, ok := <-o.doneCh:
-			if !ok {
-				return
-			}
-
 		case token, ok := <-o.tokensReleaseCh:
 			if !ok {
 				return
 			}
 
-			o.tokensSupplyCh <- token
+			// Check if we're paused w.r.t. starting new reassignments.
+			o.m.Lock()
+			doneCh := o.doneCh
+			tokensResumeCh := o.tokensResumeCh
+			o.m.Unlock()
+
+			if doneCh != nil {
+				if tokensResumeCh != nil {
+					select {
+					case <-doneCh:
+						// PASS.
+					case <-tokensResumeCh:
+						o.tokensSupplyCh <- token
+					}
+				} else {
+					o.tokensSupplyCh <- token
+				}
+			}
 		}
 	}
 }
@@ -196,9 +233,13 @@ func (o *Orchestrator) runNodes() {
 }
 
 func (o *Orchestrator) runNode(node string) error {
+	o.m.Lock()
+	doneCh := o.doneCh
+	o.m.Unlock()
+
 	for {
 		select {
-		case _, ok := <-o.doneCh:
+		case _, ok := <-doneCh:
 			if !ok {
 				return nil
 			}
