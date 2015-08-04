@@ -100,6 +100,7 @@ func OrchestrateMoves(
 	partitionState PartitionStateFunc,
 ) (*Orchestrator, error) {
 	m := options.MaxConcurrentPartitionMovesPerCluster
+	n := options.MaxConcurrentPartitionBuildsPerNode
 
 	o := &Orchestrator{
 		label:             label,
@@ -113,14 +114,34 @@ func OrchestrateMoves(
 		partitionState:    partitionState,
 		progressCh:        make(chan OrchestratorProgress),
 		doneCh:            make(chan struct{}),
-		tokensPauseCh:     make(chan struct{}),
+		tokensPauseCh:     nil,
 		tokensSupplyCh:    make(chan int, m),
 		tokensReleaseCh:   make(chan int),
 	}
 
+	nodesDoneCh := make(chan error)
+
+	// Start node workers.
+	for _, node := range o.nodesAll {
+		for i := 0; i < n; i++ {
+			go func() {
+				nodesDoneCh <- o.runNode(node)
+			}()
+		}
+	}
+
+	// Supply tokens to node workers.
 	go o.runTokens(m)
 
-	go o.runNodes()
+	go func() { // Wait for node workers and then cleanup.
+		for i := 0; i < len(o.nodesAll)*n; i++ {
+			<-nodesDoneCh
+		}
+
+		close(o.tokensReleaseCh)
+
+		close(o.progressCh)
+	}()
 
 	return o, nil
 }
@@ -212,28 +233,6 @@ func (o *Orchestrator) runTokens(numStartTokens int) {
 			}
 		}
 	}
-}
-
-func (o *Orchestrator) runNodes() {
-	n := o.options.MaxConcurrentPartitionBuildsPerNode
-
-	nodesDoneCh := make(chan error)
-
-	for _, node := range o.nodesAll {
-		for i := 0; i < n; i++ {
-			go func() {
-				nodesDoneCh <- o.runNode(node)
-			}()
-		}
-	}
-
-	for i := 0; i < len(o.nodesAll)*n; i++ {
-		<-nodesDoneCh
-	}
-
-	close(o.tokensReleaseCh)
-
-	close(o.progressCh)
 }
 
 func (o *Orchestrator) runNode(node string) error {
