@@ -38,7 +38,7 @@ type Orchestrator struct {
 
 	m sync.Mutex
 
-	tokensResumeCh  chan struct{} // May be nil; non-nil when paused.
+	tokensPauseCh   chan struct{} // May be nil; non-nil when paused.
 	tokensSupplyCh  chan int
 	tokensReleaseCh chan int
 }
@@ -113,7 +113,7 @@ func OrchestrateMoves(
 		partitionState:    partitionState,
 		progressCh:        make(chan OrchestratorProgress),
 		doneCh:            make(chan struct{}),
-		tokensResumeCh:    make(chan struct{}),
+		tokensPauseCh:     make(chan struct{}),
 		tokensSupplyCh:    make(chan int, m),
 		tokensReleaseCh:   make(chan int),
 	}
@@ -153,8 +153,8 @@ func (o *Orchestrator) ProgressCh() chan OrchestratorProgress {
 // assignments.  PauseNewAssignments is idempotent.
 func (o *Orchestrator) PauseNewAssignments() error {
 	o.m.Lock()
-	if o.tokensResumeCh == nil {
-		o.tokensResumeCh = make(chan struct{})
+	if o.tokensPauseCh == nil {
+		o.tokensPauseCh = make(chan struct{})
 	}
 	o.m.Unlock()
 	return nil
@@ -164,9 +164,9 @@ func (o *Orchestrator) PauseNewAssignments() error {
 // assignments of partitions to nodes, and is idempotent.
 func (o *Orchestrator) ResumeNewAssignments() error {
 	o.m.Lock()
-	if o.tokensResumeCh != nil {
-		close(o.tokensResumeCh)
-		o.tokensResumeCh = nil
+	if o.tokensPauseCh != nil {
+		close(o.tokensPauseCh)
+		o.tokensPauseCh = nil
 	}
 	o.m.Unlock()
 	return nil // TODO.
@@ -195,15 +195,15 @@ func (o *Orchestrator) runTokens(numStartTokens int) {
 			// Check if we're paused w.r.t. starting new reassignments.
 			o.m.Lock()
 			doneCh := o.doneCh
-			tokensResumeCh := o.tokensResumeCh
+			tokensPauseCh := o.tokensPauseCh
 			o.m.Unlock()
 
 			if doneCh != nil {
-				if tokensResumeCh != nil {
+				if tokensPauseCh != nil {
 					select {
 					case <-doneCh:
 						// PASS.
-					case <-tokensResumeCh:
+					case <-tokensPauseCh:
 						o.tokensSupplyCh <- token
 					}
 				} else {
@@ -227,7 +227,7 @@ func (o *Orchestrator) runNodes() {
 		}
 	}
 
-	for i := 0; i < len(o.nodesAll) * n; i++ {
+	for i := 0; i < len(o.nodesAll)*n; i++ {
 		<-nodesDoneCh
 	}
 
