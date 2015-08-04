@@ -215,15 +215,19 @@ func (o *Orchestrator) runTokens(numStartTokens int) {
 }
 
 func (o *Orchestrator) runNodes() {
+	n := o.options.MaxConcurrentPartitionBuildsPerNode
+
 	nodesDoneCh := make(chan error)
 
 	for _, node := range o.nodesAll {
-		go func() {
-			nodesDoneCh <- o.runNode(node)
-		}()
+		for i := 0; i < n; i++ {
+			go func() {
+				nodesDoneCh <- o.runNode(node)
+			}()
+		}
 	}
 
-	for range o.nodesAll {
+	for i := 0; i < len(o.nodesAll) * n; i++ {
 		<-nodesDoneCh
 	}
 
