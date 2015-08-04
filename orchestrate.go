@@ -34,13 +34,15 @@ type Orchestrator struct {
 	partitionState    PartitionStateFunc
 
 	progressCh chan OrchestratorProgress
-	doneCh     chan struct{} // Becomes nil when done.
+
+	tokensSupplyCh  chan int
+	tokensReleaseCh chan int
 
 	m sync.Mutex
 
-	tokensPauseCh   chan struct{} // May be nil; non-nil when paused.
-	tokensSupplyCh  chan int
-	tokensReleaseCh chan int
+	stopCh   chan struct{} // Becomes nil when stopped.
+	pauseCh  chan struct{} // May be nil; non-nil when paused.
+	progress OrchestratorProgress
 }
 
 type OrchestratorOptions struct {
@@ -113,10 +115,10 @@ func OrchestrateMoves(
 		unassignPartition: unassignPartition,
 		partitionState:    partitionState,
 		progressCh:        make(chan OrchestratorProgress),
-		doneCh:            make(chan struct{}),
-		tokensPauseCh:     nil,
+		stopCh:            make(chan struct{}),
+		pauseCh:           nil,
 		tokensSupplyCh:    make(chan int, m),
-		tokensReleaseCh:   make(chan int),
+		tokensReleaseCh:   make(chan int, m),
 	}
 
 	nodesDoneCh := make(chan error)
@@ -150,9 +152,9 @@ func OrchestrateMoves(
 // caller will eventually see a closed progress channel.
 func (o *Orchestrator) Stop() {
 	o.m.Lock()
-	if o.doneCh != nil {
-		close(o.doneCh)
-		o.doneCh = nil
+	if o.stopCh != nil {
+		close(o.stopCh)
+		o.stopCh = nil
 	}
 	o.m.Unlock()
 }
@@ -174,8 +176,8 @@ func (o *Orchestrator) ProgressCh() chan OrchestratorProgress {
 // assignments.  PauseNewAssignments is idempotent.
 func (o *Orchestrator) PauseNewAssignments() error {
 	o.m.Lock()
-	if o.tokensPauseCh == nil {
-		o.tokensPauseCh = make(chan struct{})
+	if o.pauseCh == nil {
+		o.pauseCh = make(chan struct{})
 	}
 	o.m.Unlock()
 	return nil
@@ -185,9 +187,9 @@ func (o *Orchestrator) PauseNewAssignments() error {
 // assignments of partitions to nodes, and is idempotent.
 func (o *Orchestrator) ResumeNewAssignments() error {
 	o.m.Lock()
-	if o.tokensPauseCh != nil {
-		close(o.tokensPauseCh)
-		o.tokensPauseCh = nil
+	if o.pauseCh != nil {
+		close(o.pauseCh)
+		o.pauseCh = nil
 	}
 	o.m.Unlock()
 	return nil // TODO.
@@ -215,16 +217,17 @@ func (o *Orchestrator) runTokens(numStartTokens int) {
 
 			// Check if we're paused w.r.t. starting new reassignments.
 			o.m.Lock()
-			doneCh := o.doneCh
-			tokensPauseCh := o.tokensPauseCh
+			stopCh := o.stopCh
+			pauseCh := o.pauseCh
 			o.m.Unlock()
 
-			if doneCh != nil {
-				if tokensPauseCh != nil {
+			if stopCh != nil {
+				if pauseCh != nil {
 					select {
-					case <-doneCh:
+					case <-stopCh:
 						// PASS.
-					case <-tokensPauseCh:
+					case <-pauseCh:
+						// We're now resumed.
 						o.tokensSupplyCh <- token
 					}
 				} else {
@@ -237,12 +240,12 @@ func (o *Orchestrator) runTokens(numStartTokens int) {
 
 func (o *Orchestrator) runNode(node string) error {
 	o.m.Lock()
-	doneCh := o.doneCh
+	stopCh := o.stopCh
 	o.m.Unlock()
 
 	for {
 		select {
-		case _, ok := <-doneCh:
+		case _, ok := <-stopCh:
 			if !ok {
 				return nil
 			}
