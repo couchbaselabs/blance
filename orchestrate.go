@@ -46,8 +46,8 @@ type Orchestrator struct {
 }
 
 type OrchestratorOptions struct {
-	MaxConcurrentPartitionMovesPerCluster int
-	MaxConcurrentPartitionBuildsPerNode   int
+	MaxConcurrentPartitionBuildsPerCluster int
+	MaxConcurrentPartitionBuildsPerNode    int
 }
 
 type OrchestratorProgress struct {
@@ -101,7 +101,7 @@ func OrchestrateMoves(
 	unassignPartition UnassignPartitionFunc,
 	partitionState PartitionStateFunc,
 ) (*Orchestrator, error) {
-	m := options.MaxConcurrentPartitionMovesPerCluster
+	m := options.MaxConcurrentPartitionBuildsPerCluster
 	n := options.MaxConcurrentPartitionBuildsPerNode
 
 	o := &Orchestrator{
