@@ -38,7 +38,7 @@ type Orchestrator struct {
 	tokensSupplyCh  chan int
 	tokensReleaseCh chan int
 
-	m sync.Mutex
+	m sync.Mutex // Protects the fields that follow.
 
 	stopCh   chan struct{} // Becomes nil when stopped.
 	pauseCh  chan struct{} // May be nil; non-nil when paused.
@@ -51,7 +51,7 @@ type OrchestratorOptions struct {
 }
 
 type OrchestratorProgress struct {
-	Error                       error
+	Errors                      []error
 	TotPartitionsAssigned       int
 	TotPartitionsAssignedDone   int
 	TotPartitionsUnassigned     int
@@ -88,8 +88,9 @@ type PartitionStateFunc func(
 
 // OrchestratorMoves asynchronously begins reassigning partitions
 // amongst nodes to reach the destMap state, invoking the callback
-// functions like assignPartition() and unassignPartition() affect
-// changes.
+// functions like assignPartition() and unassignPartition() to affect
+// changes.  Additionally, the caller must read the progress channel
+// until it's closed to avoid blocking the orchestration.
 func OrchestrateMoves(
 	label string,
 	partitionModel PartitionModel,
@@ -137,7 +138,15 @@ func OrchestrateMoves(
 
 	go func() { // Wait for node workers and then cleanup.
 		for i := 0; i < len(o.nodesAll)*n; i++ {
-			<-nodesDoneCh
+			err := <-nodesDoneCh
+			if err != nil {
+				o.m.Lock()
+				o.progress.Errors = append(o.progress.Errors, err)
+				progress := o.progress
+				o.m.Unlock()
+
+				o.progressCh <- progress
+			}
 		}
 
 		close(o.tokensReleaseCh)
