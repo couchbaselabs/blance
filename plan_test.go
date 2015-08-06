@@ -100,7 +100,8 @@ func TestRemoveNodesFromNodesByState(t *testing.T) {
 	for i, c := range tests {
 		r := removeNodesFromNodesByState(c.nodesByState, c.removeNodes, nil)
 		if !reflect.DeepEqual(r, c.exp) {
-			t.Errorf("i: %d, nodesByState: %#v, removeNodes: %#v, exp: %#v, got: %#v",
+			t.Errorf("i: %d, nodesByState: %#v,"+
+				" removeNodes: %#v, exp: %#v, got: %#v",
 				i, c.nodesByState, c.removeNodes, c.exp, r)
 		}
 	}
@@ -314,7 +315,8 @@ func TestFindAncestor(t *testing.T) {
 	for i, c := range tests {
 		r := findAncestor("a", c.mapParents, c.level)
 		if !reflect.DeepEqual(r, c.exp) {
-			t.Errorf("i: %d, level: %d, mapParents: %#v, RESULT: %#v, EXPECTED: %#v",
+			t.Errorf("i: %d, level: %d, mapParents: %#v,"+
+				" RESULT: %#v, EXPECTED: %#v",
 				i, c.level, c.mapParents, r, c.exp)
 		}
 	}
@@ -1490,11 +1492,13 @@ func TestPlanNextMap(t *testing.T) {
 			jc, _ := json.Marshal(c)
 			jr, _ := json.Marshal(r)
 			jexp, _ := json.Marshal(c.exp)
-			t.Errorf("i: %d, planNextMap, c: %s, [RESULT] r: %s, [EXPECTED] exp: %s",
+			t.Errorf("i: %d, planNextMap, c: %s,"+
+				" [RESULT] r: %s, [EXPECTED] exp: %s",
 				i, jc, jr, jexp)
 		}
 		if c.expNumWarnings != len(rWarnings) {
-			t.Errorf("i: %d, planNextMap.warnings, c: %#v, rWarnings: %v, expNumWarnings: %d",
+			t.Errorf("i: %d, planNextMap.warnings,"+
+				" c: %#v, rWarnings: %v, expNumWarnings: %d",
 				i, c, rWarnings, c.expNumWarnings)
 		}
 	}
@@ -1578,7 +1582,8 @@ func testVisTestCases(t *testing.T, tests []VisTestCase) {
 				stateName := stateNames[cell.entry[0:1]]
 				if stateName != "" {
 					partition.NodesByState[stateName] =
-						append(partition.NodesByState[stateName], cell.nodeName)
+						append(partition.NodesByState[stateName],
+						cell.nodeName)
 				}
 			}
 
@@ -1599,7 +1604,8 @@ func testVisTestCases(t *testing.T, tests []VisTestCase) {
 				stateName := stateNames[cell.entry[0:1]]
 				if stateName != "" {
 					partition.NodesByState[stateName] =
-						append(partition.NodesByState[stateName], cell.nodeName)
+						append(partition.NodesByState[stateName],
+						cell.nodeName)
 				}
 			}
 		}
