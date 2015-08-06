@@ -164,6 +164,38 @@ func TestCalcPartitionMoves(t *testing.T) {
 			" a    | b",
 		},
 		{
+			"",
+			"+a",
+			" a",
+		},
+		{
+			" a",
+			"-a",
+			"",
+		},
+		{
+			"",
+			`+a    |
+			  a    |+b`,
+			" a    | b",
+		},
+		{
+			" a    | b",
+			` a    |-b`,
+			" a",
+		},
+		{
+			" a    | b",
+			`-a    | b`,
+			"      | b",
+		},
+		{
+			" a    | b",
+			`-a    | b
+			       |-b`, // NOTE: Some may say we should remove replica first.
+			"",
+		},
+		{
 			" a",
 			` a +b |
 			 -a  b |`,
