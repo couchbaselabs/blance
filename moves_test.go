@@ -166,35 +166,35 @@ func TestCalcPartitionMoves(t *testing.T) {
 		{
 			" a",
 			` a +b |
-             -a  b |`,
+			 -a  b |`,
 			"    b",
 		},
 		{
 			" a    | b  c",
 			` a +b |-b  c
-             -a  b |    c
-                 b |    c +d`,
+			 -a  b |    c
+			     b |    c +d`,
 			"    b |    c  d",
 		},
 		{
 			" a    |    b",
 			` a +b |   -b
-             -a  b |+a`,
+			 -a  b |+a`,
 			"    b | a",
 		},
 		{
 			" a    |    b",
 			` a +c |    b
-             -a  c |+a  b
-                 c | a -b`,
+			 -a  c |+a  b
+			     c | a -b`,
 			"    c | a",
 		},
 		{
 			" a    | b",
 			` a +c | b
-             -a  c | b
-                 c | b +d
-                 c |-b  d`,
+			 -a  c | b
+			     c | b +d
+			     c |-b  d`,
 			"    c |    d",
 		},
 	}
