@@ -20,7 +20,7 @@ import (
 type Orchestrator struct {
 	label string
 
-	partitionModel PartitionModel
+	model PartitionModel
 
 	options OrchestratorOptions
 
@@ -28,6 +28,8 @@ type Orchestrator struct {
 
 	begMap PartitionMap
 	endMap PartitionMap
+
+	movesByPartition map[string][]NodeState
 
 	assignPartition   AssignPartitionFunc
 	unassignPartition UnassignPartitionFunc
@@ -94,7 +96,7 @@ type PartitionStateFunc func(
 // OrchestrateMoves to avoid blocking the orchestration.
 func OrchestrateMoves(
 	label string,
-	partitionModel PartitionModel,
+	model PartitionModel,
 	options OrchestratorOptions,
 	nodesAll []string,
 	begMap PartitionMap,
@@ -106,13 +108,24 @@ func OrchestrateMoves(
 	m := options.MaxConcurrentPartitionBuildsPerCluster
 	n := options.MaxConcurrentPartitionBuildsPerNode
 
+	states := sortStateNames(model)
+
+	movesByPartition := map[string][]NodeState{}
+	for partitionName, begPartition := range begMap {
+		movesByPartition[partitionName] =
+			CalcPartitionMoves(states,
+				begPartition.NodesByState,
+				endMap[partitionName].NodesByState)
+	}
+
 	o := &Orchestrator{
 		label:             label,
-		partitionModel:    partitionModel,
+		model:             model,
 		options:           options,
 		nodesAll:          nodesAll,
 		begMap:            begMap,
 		endMap:            endMap,
+		movesByPartition:  movesByPartition,
 		assignPartition:   assignPartition,
 		unassignPartition: unassignPartition,
 		partitionState:    partitionState,
