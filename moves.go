@@ -11,23 +11,24 @@
 
 package blance
 
-// NodeState associates a node with a state.  An array of NodeStates
+// A NodeState associates a node with a state.  An array of NodeStates
 // could be interpreted as a series of node-by-node state transitions
-// for a partition.  For example, for partition X, first set node A to
-// "master", then set node B to "replica", then remove partition X
-// from node C (where its state will be "").
+// for a partition.  For example, for partition X, the NodeState
+// transitions might be: first set node A to "master", then set node B
+// to "replica", then remove partition X from node C (where its state
+// will be "").
 type NodeState struct {
 	Node  string
 	State string
 }
 
-// CalcPartitionMoves computes the step-by-step moves need to
-// transition a partition from begNodesByState to endNodesByState.
+// CalcPartitionMoves computes the step-by-step moves to transition a
+// partition from begNodesByState to endNodesByState.
 //
 // The states is an array of state names, like ["primary",
 // "hotStandBy", "coldStandBy"], and should be ordered by more
-// superior states coming earlier.  For example, "master" should come
-// before "replica".
+// superior or important states coming earlier.  For example, "master"
+// should come before "replica".
 //
 // The begNodesByState and endNodesByState are keyed by stateName,
 // where the values are an array of node names.  For example,
