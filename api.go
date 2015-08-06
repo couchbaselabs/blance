@@ -32,8 +32,8 @@ type Partition struct {
 	// The Name of a Partition must be unique within a PartitionMap.
 	Name string `json:"name"`
 
-	// NodesByState is keyed is stateName, and value is an array of
-	// node names.  For example, {"master": ["a"], "replica": ["b",
+	// NodesByState is keyed is stateName, and the values are an array
+	// of node names.  For example, {"master": ["a"], "replica": ["b",
 	// "c"]}.
 	NodesByState map[string][]string `json:"nodesByState"`
 }

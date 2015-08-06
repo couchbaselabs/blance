@@ -11,50 +11,79 @@
 
 package blance
 
+// NodeState associates a node with a state.  An array of NodeStates
+// could be interpreted as a series of node-by-node state transitions
+// for a partition.  For example, for partition X, first set node A to
+// "master", then set node B to "replica", then remove partition X
+// from node C (where its state will be "").
 type NodeState struct {
 	Node  string
 	State string
 }
 
-// The states should be ordered by most superior state first.  The
-// begNodesByState and endNodesByState are keyed is stateName, and
-// value is an array of node names.  For example, {"master": ["a"],
-// "replica": ["b", "c"]}.
+// CalcPartitionMoves computes the step-by-step moves need to
+// transition a partition from begNodesByState to endNodesByState.
+//
+// The states is an array of state names, like ["primary",
+// "hotStandBy", "coldStandBy"], and should be ordered by more
+// superior states coming earlier.  For example, "master" should come
+// before "replica".
+//
+// The begNodesByState and endNodesByState are keyed by stateName,
+// where the values are an array of node names.  For example,
+// {"master": ["a"], "replica": ["b", "c"]}.
 func CalcPartitionMoves(
 	states []string,
 	begNodesByState map[string][]string,
 	endNodesByState map[string][]string,
 ) []NodeState {
-	/*
-	   	var moves []NodeState
+	var moves []NodeState
 
-	   	nodesAll := map[string]bool{}
-	   	for _, nodes := range begNodesByState {
-	   		for _, node := range nodes {
-	   			if !nodesAll[node] {
-	   				nodesAll[node] = true
-	   			}
-	   		}
-	   	}
-	   	for _, nodes := range endNodesByState {
-	   		for _, node := range nodes {
-	   			if !nodesAll[node] {
-	   				nodesAll[node] = true
-	   			}
-	   		}
-	   	}
+	seen := map[string]bool{}
 
-	   	for statei, state := range states {
-	           // Handle demotions of superiorTo(state) to state.
-	   		for j := statei - 1; j >= 0; j-- {
-	   			// superiorState := states[j]
-	   			// begNodesByState[state]
-	   		}
-	   		// Handle promotions of inferiorTo(state) to state.
-	   		// Handle clean additions of state.
-	   		// Handle clean removals of state.
-	   	}
-	*/
+	addMoves := func(nodes []string, state string) {
+		for _, node := range nodes {
+			if !seen[node] {
+				seen[node] = true
+				moves = append(moves, NodeState{node, state})
+			}
+		}
+	}
+
+	for statei, state := range states {
+		// Handle demotions of superiorTo(state) to state.
+		addMoves(findStateChanges(0, statei,
+			state, states, begNodesByState, endNodesByState), state)
+
+		// Handle promotions of inferiorTo(state) to state.
+		addMoves(findStateChanges(statei+1, len(states),
+			state, states, begNodesByState, endNodesByState), state)
+
+		// Handle clean additions of state.
+		addMoves(StringsRemoveStrings(
+			endNodesByState[state], begNodesByState[state]), state)
+
+		// Handle clean removals of state.
+		addMoves(StringsRemoveStrings(
+			begNodesByState[state], endNodesByState[state]), "")
+	}
 
 	return nil
+}
+
+func findStateChanges(begStateIdx, endStateIdx int,
+	state string, states []string,
+	begNodesByState map[string][]string,
+	endNodesByState map[string][]string) (rv []string) {
+	for _, node := range endNodesByState[state] {
+		for i := begStateIdx; i < endStateIdx; i++ {
+			for _, n := range begNodesByState[states[i]] {
+				if n == node {
+					rv = append(rv, node)
+				}
+			}
+		}
+	}
+
+	return rv
 }
