@@ -26,8 +26,8 @@ type Orchestrator struct {
 
 	nodesAll []string
 
-	destMap PartitionMap
-	currMap func() (PartitionMap, error)
+	begMap PartitionMap
+	endMap PartitionMap
 
 	assignPartition   AssignPartitionFunc
 	unassignPartition UnassignPartitionFunc
@@ -87,17 +87,18 @@ type PartitionStateFunc func(
 	err error)
 
 // OrchestratorMoves asynchronously begins reassigning partitions
-// amongst nodes to reach the destMap state, invoking the callback
-// functions like assignPartition() and unassignPartition() to affect
-// changes.  Additionally, the caller must read the progress channel
-// until it's closed to avoid blocking the orchestration.
+// amongst nodes to transition from the begMap to the endMap state,
+// invoking the callback functions like assignPartition() and
+// unassignPartition() to affect changes.  Additionally, the caller
+// must read the progress channel until it's closed by
+// OrchestrateMoves to avoid blocking the orchestration.
 func OrchestrateMoves(
 	label string,
 	partitionModel PartitionModel,
 	options OrchestratorOptions,
 	nodesAll []string,
-	destMap PartitionMap,
-	currMap func() (PartitionMap, error),
+	begMap PartitionMap,
+	endMap PartitionMap,
 	assignPartition AssignPartitionFunc,
 	unassignPartition UnassignPartitionFunc,
 	partitionState PartitionStateFunc,
@@ -110,8 +111,8 @@ func OrchestrateMoves(
 		partitionModel:    partitionModel,
 		options:           options,
 		nodesAll:          nodesAll,
-		destMap:           destMap,
-		currMap:           currMap,
+		begMap:            begMap,
+		endMap:            endMap,
 		assignPartition:   assignPartition,
 		unassignPartition: unassignPartition,
 		partitionState:    partitionState,

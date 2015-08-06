@@ -13,8 +13,8 @@ func TestOrchestrateMoves(t *testing.T) {
 	}
 
 	var nodesAll []string
-	var destMap PartitionMap
-	var currMap func() (PartitionMap, error)
+	var begMap PartitionMap
+	var endMap PartitionMap
 	var assignPartition AssignPartitionFunc
 	var unassignPartition UnassignPartitionFunc
 	var partitionState PartitionStateFunc
@@ -23,8 +23,8 @@ func TestOrchestrateMoves(t *testing.T) {
 		partitionModel,
 		options,
 		nodesAll,
-		destMap,
-		currMap,
+		begMap,
+		endMap,
 		assignPartition,
 		unassignPartition,
 		partitionState)

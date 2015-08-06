@@ -1583,7 +1583,7 @@ func testVisTestCases(t *testing.T, tests []VisTestCase) {
 				if stateName != "" {
 					partition.NodesByState[stateName] =
 						append(partition.NodesByState[stateName],
-						cell.nodeName)
+							cell.nodeName)
 				}
 			}
 
@@ -1605,7 +1605,7 @@ func testVisTestCases(t *testing.T, tests []VisTestCase) {
 				if stateName != "" {
 					partition.NodesByState[stateName] =
 						append(partition.NodesByState[stateName],
-						cell.nodeName)
+							cell.nodeName)
 				}
 			}
 		}
