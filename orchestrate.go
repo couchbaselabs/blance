@@ -29,7 +29,7 @@ type Orchestrator struct {
 	begMap PartitionMap
 	endMap PartitionMap
 
-	movesByPartition map[string][]NodeState
+	movesByPartition map[string][]NodeStateOp
 
 	assignPartition   AssignPartitionFunc
 	unassignPartition UnassignPartitionFunc
@@ -111,14 +111,14 @@ func OrchestrateMoves(
 	m := options.MaxConcurrentPartitionBuildsPerCluster
 	n := options.MaxConcurrentPartitionBuildsPerNode
 
-	nodeChs := map[string]chan NodeState{}
+	nodeChs := map[string]chan NodeStateOp{}
 	for _, node := range nodesAll {
-		nodeChs[node] = make(chan NodeState)
+		nodeChs[node] = make(chan NodeStateOp)
 	}
 
 	states := sortStateNames(model)
 
-	movesByPartition := map[string][]NodeState{}
+	movesByPartition := map[string][]NodeStateOp{}
 
 	for partitionName, begPartition := range begMap {
 		endPartition := endMap[partitionName]

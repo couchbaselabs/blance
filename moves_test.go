@@ -242,6 +242,11 @@ func TestCalcPartitionMoves(t *testing.T) {
 		"-": "+",
 	}
 
+	ops := map[string]string{
+		"+": "add",
+		"-": "del",
+	}
+
 	for testi, test := range tests {
 		before := convertLineToNodesByState(test.before, states)
 		after := convertLineToNodesByState(test.after, states)
@@ -325,6 +330,29 @@ func TestCalcPartitionMoves(t *testing.T) {
 								" test: %#v, move: %s,"+
 								" flipSideFound: %q, flipSideState: %q",
 								testi, stateExp, before, after,
+								movesExp, movesGot, test, move,
+								flipSideFound, flipSideState)
+						}
+
+						if flipSideFound != "" {
+							if moveGot.Op != "promote" &&
+								moveGot.Op != "demote" {
+								t.Errorf("testi: %d, wanted pro/demote,"+
+									" before: %#v, after: %#v,"+
+									" movesExp: %#v, movesGot: %#v,"+
+									" test: %#v, move: %s,"+
+									" flipSideFound: %q, flipSideState: %q",
+									testi, before, after,
+									movesExp, movesGot, test, move,
+									flipSideFound, flipSideState)
+							}
+						} else if moveGot.Op != ops[op] {
+							t.Errorf("testi: %d, wanted op: %q,"+
+								" before: %#v, after: %#v,"+
+								" movesExp: %#v, movesGot: %#v,"+
+								" test: %#v, move: %s,"+
+								" flipSideFound: %q, flipSideState: %q",
+								testi, ops[op], before, after,
 								movesExp, movesGot, test, move,
 								flipSideFound, flipSideState)
 						}

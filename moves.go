@@ -11,15 +11,16 @@
 
 package blance
 
-// A NodeState associates a node with a state.  An array of NodeStates
-// could be interpreted as a series of node-by-node state transitions
-// for a partition.  For example, for partition X, the NodeState
-// transitions might be: first set node A to "master", then set node B
-// to "replica", then remove partition X from node C (where its state
-// will be "").
-type NodeState struct {
+// A NodeStateOp associates a node with a state and operation.  An
+// array of NodeStateOp's could be interpreted as a series of
+// node-by-node state transitions for a partition.  For example, for
+// partition X, the NodeState transitions might be: first add node A
+// to "master", then demote node B to "replica", then remove (or sub)
+// partition X from node C (its state will be "").
+type NodeStateOp struct {
 	Node  string
 	State string
+	Op    string // Ex: "add", "del", "promote", "demote".
 }
 
 // CalcPartitionMoves computes the step-by-step moves to transition a
@@ -37,16 +38,16 @@ func CalcPartitionMoves(
 	states []string,
 	begNodesByState map[string][]string,
 	endNodesByState map[string][]string,
-) []NodeState {
-	var moves []NodeState
+) []NodeStateOp {
+	var moves []NodeStateOp
 
 	seen := map[string]bool{}
 
-	addMoves := func(nodes []string, state string) {
+	addMoves := func(nodes []string, state, op string) {
 		for _, node := range nodes {
 			if !seen[node] {
 				seen[node] = true
-				moves = append(moves, NodeState{node, state})
+				moves = append(moves, NodeStateOp{node, state, op})
 			}
 		}
 	}
@@ -55,28 +56,30 @@ func CalcPartitionMoves(
 	endNodes := flattenNodesByState(endNodesByState)
 
 	adds := StringsRemoveStrings(endNodes, begNodes)
-	subs := StringsRemoveStrings(begNodes, endNodes)
+	dels := StringsRemoveStrings(begNodes, endNodes)
 
 	for statei, state := range states {
 		// Handle demotions of superiorTo(state) to state.
 		addMoves(findStateChanges(0, statei,
-			state, states, begNodesByState, endNodesByState), state)
+			state, states, begNodesByState, endNodesByState),
+			state, "demote")
 
 		// Handle promotions of inferiorTo(state) to state.
 		addMoves(findStateChanges(statei+1, len(states),
-			state, states, begNodesByState, endNodesByState), state)
+			state, states, begNodesByState, endNodesByState),
+			state, "promote")
 
 		// Handle clean additions of state.
 		addMoves(StringsIntersectStrings(StringsRemoveStrings(
 			endNodesByState[state], begNodesByState[state]),
 			adds),
-			state)
+			state, "add")
 
-		// Handle clean removals of state.
+		// Handle clean deletions of state.
 		addMoves(StringsIntersectStrings(StringsRemoveStrings(
 			begNodesByState[state], endNodesByState[state]),
-			subs),
-			"")
+			dels),
+			"", "del")
 	}
 
 	return moves
