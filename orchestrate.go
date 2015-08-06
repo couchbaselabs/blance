@@ -58,9 +58,9 @@ type OrchestratorProgress struct {
 	TotPartitionsAssignedDone   int
 	TotPartitionsUnassigned     int
 	TotPartitionsUnassignedDone int
-	TotRunNode                  int
-	TotRunNodeDone              int
-	TotRunNodeDoneErr           int
+	TotRunMover                 int
+	TotRunMoverDone             int
+	TotRunMoverDoneErr          int
 }
 
 // AssignPartitionFunc is a callback invoked by OrchestrateMoves()
@@ -143,33 +143,33 @@ func OrchestrateMoves(
 
 	stopCh := o.stopCh
 
-	runNodeDoneCh := make(chan error)
+	runMoverDoneCh := make(chan error)
 
-	// Start node workers.
+	// Start concurrent movers.
 	for _, node := range o.nodesAll {
 		for i := 0; i < n; i++ {
 			go func() {
 				o.m.Lock()
-				o.progress.TotRunNode++
+				o.progress.TotRunMover++
 				o.m.Unlock()
 
-				runNodeDoneCh <- o.runNode(node, stopCh)
+				runMoverDoneCh <- o.runMover(node, stopCh)
 			}()
 		}
 	}
 
-	// Supply tokens to node workers.
+	// Supply tokens to movers.
 	go o.runTokens(m)
 
-	go func() { // Wait for node workers and then cleanup.
+	go func() { // Wait for movers to finish and then cleanup.
 		for i := 0; i < len(o.nodesAll)*n; i++ {
-			err := <-runNodeDoneCh
+			err := <-runMoverDoneCh
 
 			o.m.Lock()
-			o.progress.TotRunNodeDone++
+			o.progress.TotRunMoverDone++
 			if err != nil {
 				o.progress.Errors = append(o.progress.Errors, err)
-				o.progress.TotRunNodeDoneErr++
+				o.progress.TotRunMoverDoneErr++
 			}
 			progress := o.progress
 			o.m.Unlock()
@@ -275,7 +275,7 @@ func (o *Orchestrator) runTokens(numStartTokens int) {
 	}
 }
 
-func (o *Orchestrator) runNode(node string, stopCh chan struct{}) error {
+func (o *Orchestrator) runMover(node string, stopCh chan struct{}) error {
 	for {
 		select {
 		case _, ok := <-stopCh:
