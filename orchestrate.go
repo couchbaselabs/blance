@@ -111,6 +111,11 @@ func OrchestrateMoves(
 	m := options.MaxConcurrentPartitionBuildsPerCluster
 	n := options.MaxConcurrentPartitionBuildsPerNode
 
+	nodeChs := map[string]chan NodeState{}
+	for _, node := range nodesAll {
+		nodeChs[node] = make(chan NodeState)
+	}
+
 	states := sortStateNames(model)
 
 	movesByPartition := map[string][]NodeState{}
@@ -118,9 +123,19 @@ func OrchestrateMoves(
 	for partitionName, begPartition := range begMap {
 		endPartition := endMap[partitionName]
 
-		movesByPartition[partitionName] = CalcPartitionMoves(states,
+		moves := CalcPartitionMoves(states,
 			begPartition.NodesByState,
 			endPartition.NodesByState)
+
+		movesByPartition[partitionName] = moves
+
+		// go func(moves []NodeState) {
+		// 	for _, move := range moves {
+		//      // This ends up using goroutine (random) scheduling
+		//      // to schedule these moves.
+		// 		nodeChs[move.Node] <- move
+		// 	}
+		// }(moves)
 	}
 
 	o := &Orchestrator{
