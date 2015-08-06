@@ -2,6 +2,7 @@ package blance
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -138,6 +139,8 @@ func TestFindStateChanges(t *testing.T) {
 }
 
 func TestCalcPartitionMoves(t *testing.T) {
+	states := []string{"master", "replica"}
+
 	tests := []struct {
 		before string
 		moves  string
@@ -191,10 +194,125 @@ func TestCalcPartitionMoves(t *testing.T) {
 		},
 	}
 
+	negate := map[string]string{
+		"+": "-",
+		"-": "+",
+	}
+
 	for i, test := range tests {
-		// TODO.
-		if test.before == "" {
-			t.Errorf("i: %d, test: %#v", i, test)
+		before := convertLineToNodesByState(test.before, states)
+		after := convertLineToNodesByState(test.after, states)
+
+		var movesExp []map[string][]string
+
+		if test.moves != "" {
+			moveLines := strings.Split(test.moves, "\n")
+			for _, moveLine := range moveLines {
+				moveExp := convertLineToNodesByState(moveLine, states)
+				movesExp = append(movesExp, moveExp)
+			}
+		}
+
+		movesGot := CalcPartitionMoves(states, before, after)
+
+		if len(movesGot) != len(movesExp) {
+			t.Errorf("i: %d, mismatch lengths,"+
+				" before: %#v, after: %#v,"+
+				" movesExp: %#v, movesGot: %#v, test: %#v",
+				i, before, after, movesExp, movesGot, test)
+
+			continue
+		}
+
+		for i, moveExp := range movesExp {
+			moveGot := movesGot[i]
+
+			found := false
+
+			for statei, state := range states {
+				if found {
+					continue
+				}
+
+				for _, move := range moveExp[state] {
+					if found {
+						continue
+					}
+
+					op := move[0:1]
+					if (op == "+" || op == "-") {
+						found = true
+
+						if moveGot.Node != move[1:] {
+							t.Errorf("i: %d, wrong node,"+
+								" before: %#v, after: %#v,"+
+								" movesExp: %#v, movesGot: %#v,"+
+								" test: %#v",
+								i, before, after,
+								movesExp, movesGot, test)
+						}
+
+						flipSideFound := false
+						if statei < len(states) {
+							flipSide := negate[op] + move[1:]
+							for j := statei + 1; j < len(states); j++ {
+								for _, x := range moveExp[states[j]] {
+									if x == flipSide {
+										flipSideFound = true
+									}
+								}
+							}
+						}
+
+						if !flipSideFound {
+							stateExp := state
+							if op == "-" {
+								stateExp = ""
+							}
+
+							if moveGot.State != stateExp {
+								t.Errorf("i: %d, not stateExp: %q,"+
+									" before: %#v, after: %#v,"+
+									" movesExp: %#v, movesGot: %#v,"+
+									" test: %#v",
+									i, stateExp, before, after,
+									movesExp, movesGot, test)
+							}
+						}
+					}
+				}
+			}
 		}
 	}
+}
+
+// Converts an input line string like " a b | +c -d", with input
+// states of ["master", "replica"] to something like {"master": ["a",
+// "b"], "replica": ["+c", "-d"]}.
+func convertLineToNodesByState(
+	line string, states []string) map[string][]string {
+	nodesByState := map[string][]string{}
+
+	line = strings.Trim(line, " ")
+	for {
+		linex := strings.Replace(line, "  ", " ", -1)
+		if linex == line {
+			break
+		}
+		line = linex
+	}
+
+	parts := strings.Split(line, "|")
+	for i, state := range states {
+		if i >= len(parts) {
+			break
+		}
+		part := strings.Trim(parts[i], " ")
+		if part != "" {
+			nodes := strings.Split(part, " ")
+			nodesByState[state] = append(nodesByState[state], nodes...)
+		}
+	}
+
+	return nodesByState
 }

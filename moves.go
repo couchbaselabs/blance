@@ -68,7 +68,7 @@ func CalcPartitionMoves(
 			begNodesByState[state], endNodesByState[state]), "")
 	}
 
-	return nil
+	return moves
 }
 
 func findStateChanges(begStateIdx, endStateIdx int,
