@@ -284,16 +284,7 @@ func planNextMapInner(
 
 	// Run through the sorted partition states (master, slave, etc)
 	// that have constraints and invoke assignStateToPartitions().
-	pms := &stateNameSorter{
-		m: model,
-		s: make([]string, 0, len(model)),
-	}
-	for stateName := range model {
-		pms.s = append(pms.s, stateName)
-	}
-	sort.Sort(pms)
-
-	for _, stateName := range pms.s {
+	for _, stateName := range sortStateNames(model) {
 		constraints, exists := modelStateConstraints[stateName]
 		if !exists {
 			modelState, exists := model[stateName]
@@ -413,7 +404,21 @@ func flattenNodesByState(nodesByState map[string][]string) []string {
 
 // --------------------------------------------------------
 
-// Does ORDER BY m.States[stateName].Priority ASC, stateName ASC".
+// Returns state names ordered by model.States[stateName].Priority
+// ASC, stateName ASC.
+func sortStateNames(model PartitionModel) []string {
+	pms := &stateNameSorter{
+		m: model,
+		s: make([]string, 0, len(model)),
+	}
+	for stateName := range model {
+		pms.s = append(pms.s, stateName)
+	}
+	sort.Sort(pms)
+	return pms.s
+}
+
+// Does ORDER BY m.States[stateName].Priority ASC, stateName ASC.
 type stateNameSorter struct {
 	m PartitionModel
 	s []string // This array is mutated during a sort.Sort()
