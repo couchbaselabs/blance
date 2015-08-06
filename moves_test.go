@@ -240,7 +240,7 @@ func TestCalcPartitionMoves(t *testing.T) {
 					}
 
 					op := move[0:1]
-					if (op == "+" || op == "-") {
+					if op == "+" || op == "-" {
 						found = true
 
 						if moveGot.Node != move[1:] {
