@@ -58,6 +58,9 @@ type OrchestratorProgress struct {
 	TotPartitionsAssignedDone   int
 	TotPartitionsUnassigned     int
 	TotPartitionsUnassignedDone int
+	TotRunNode                  int
+	TotRunNodeDone              int
+	TotRunNodeDoneErr           int
 }
 
 // AssignPartitionFunc is a callback invoked by OrchestrateMoves()
@@ -111,11 +114,13 @@ func OrchestrateMoves(
 	states := sortStateNames(model)
 
 	movesByPartition := map[string][]NodeState{}
+
 	for partitionName, begPartition := range begMap {
-		movesByPartition[partitionName] =
-			CalcPartitionMoves(states,
-				begPartition.NodesByState,
-				endMap[partitionName].NodesByState)
+		endPartition := endMap[partitionName]
+
+		movesByPartition[partitionName] = CalcPartitionMoves(states,
+			begPartition.NodesByState,
+			endPartition.NodesByState)
 	}
 
 	o := &Orchestrator{
@@ -136,13 +141,19 @@ func OrchestrateMoves(
 		tokensReleaseCh:   make(chan int, m),
 	}
 
-	nodesDoneCh := make(chan error)
+	stopCh := o.stopCh
+
+	runNodeDoneCh := make(chan error)
 
 	// Start node workers.
 	for _, node := range o.nodesAll {
 		for i := 0; i < n; i++ {
 			go func() {
-				nodesDoneCh <- o.runNode(node)
+				o.m.Lock()
+				o.progress.TotRunNode++
+				o.m.Unlock()
+
+				runNodeDoneCh <- o.runNode(node, stopCh)
 			}()
 		}
 	}
@@ -152,15 +163,18 @@ func OrchestrateMoves(
 
 	go func() { // Wait for node workers and then cleanup.
 		for i := 0; i < len(o.nodesAll)*n; i++ {
-			err := <-nodesDoneCh
-			if err != nil {
-				o.m.Lock()
-				o.progress.Errors = append(o.progress.Errors, err)
-				progress := o.progress
-				o.m.Unlock()
+			err := <-runNodeDoneCh
 
-				o.progressCh <- progress
+			o.m.Lock()
+			o.progress.TotRunNodeDone++
+			if err != nil {
+				o.progress.Errors = append(o.progress.Errors, err)
+				o.progress.TotRunNodeDoneErr++
 			}
+			progress := o.progress
+			o.m.Unlock()
+
+			o.progressCh <- progress
 		}
 
 		close(o.tokensReleaseCh)
@@ -261,11 +275,7 @@ func (o *Orchestrator) runTokens(numStartTokens int) {
 	}
 }
 
-func (o *Orchestrator) runNode(node string) error {
-	o.m.Lock()
-	stopCh := o.stopCh
-	o.m.Unlock()
-
+func (o *Orchestrator) runNode(node string, stopCh chan struct{}) error {
 	for {
 		select {
 		case _, ok := <-stopCh:
@@ -280,7 +290,7 @@ func (o *Orchestrator) runNode(node string) error {
 
 			partition, state, insertAt, fromNode, fromNodeTakeOver, err :=
 				o.calcNextPartitionToAssignToNode(node)
-			if err != nil {
+			if err != nil || partition == "" {
 				o.tokensReleaseCh <- token
 				return err
 			}
