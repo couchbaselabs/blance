@@ -50,6 +50,12 @@ func CalcPartitionMoves(
 		}
 	}
 
+	begNodes := flattenNodesByState(begNodesByState)
+	endNodes := flattenNodesByState(endNodesByState)
+
+	adds := StringsRemoveStrings(endNodes, begNodes)
+	subs := StringsRemoveStrings(begNodes, endNodes)
+
 	for statei, state := range states {
 		// Handle demotions of superiorTo(state) to state.
 		addMoves(findStateChanges(0, statei,
@@ -60,12 +66,16 @@ func CalcPartitionMoves(
 			state, states, begNodesByState, endNodesByState), state)
 
 		// Handle clean additions of state.
-		addMoves(StringsRemoveStrings(
-			endNodesByState[state], begNodesByState[state]), state)
+		addMoves(StringsIntersectStrings(StringsRemoveStrings(
+			endNodesByState[state], begNodesByState[state]),
+			adds),
+			state)
 
 		// Handle clean removals of state.
-		addMoves(StringsRemoveStrings(
-			begNodesByState[state], endNodesByState[state]), "")
+		addMoves(StringsIntersectStrings(StringsRemoveStrings(
+			begNodesByState[state], endNodesByState[state]),
+			subs),
+			"")
 	}
 
 	return moves

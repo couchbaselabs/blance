@@ -154,6 +154,11 @@ func TestCalcPartitionMoves(t *testing.T) {
 			" a",
 		},
 		{
+			"      | a",
+			"",
+			"      | a",
+		},
+		{
 			" a    | b",
 			"",
 			" a    | b",
@@ -199,7 +204,7 @@ func TestCalcPartitionMoves(t *testing.T) {
 		"-": "+",
 	}
 
-	for i, test := range tests {
+	for testi, test := range tests {
 		before := convertLineToNodesByState(test.before, states)
 		after := convertLineToNodesByState(test.after, states)
 
@@ -216,16 +221,16 @@ func TestCalcPartitionMoves(t *testing.T) {
 		movesGot := CalcPartitionMoves(states, before, after)
 
 		if len(movesGot) != len(movesExp) {
-			t.Errorf("i: %d, mismatch lengths,"+
+			t.Errorf("testi: %d, mismatch lengths,"+
 				" before: %#v, after: %#v,"+
 				" movesExp: %#v, movesGot: %#v, test: %#v",
-				i, before, after, movesExp, movesGot, test)
+				testi, before, after, movesExp, movesGot, test)
 
 			continue
 		}
 
-		for i, moveExp := range movesExp {
-			moveGot := movesGot[i]
+		for moveExpi, moveExp := range movesExp {
+			moveGot := movesGot[moveExpi]
 
 			found := false
 
@@ -244,40 +249,46 @@ func TestCalcPartitionMoves(t *testing.T) {
 						found = true
 
 						if moveGot.Node != move[1:] {
-							t.Errorf("i: %d, wrong node,"+
+							t.Errorf("testi: %d, wrong node,"+
 								" before: %#v, after: %#v,"+
 								" movesExp: %#v, movesGot: %#v,"+
 								" test: %#v",
-								i, before, after,
+								testi, before, after,
 								movesExp, movesGot, test)
 						}
 
-						flipSideFound := false
-						if statei < len(states) {
-							flipSide := negate[op] + move[1:]
-							for j := statei + 1; j < len(states); j++ {
-								for _, x := range moveExp[states[j]] {
-									if x == flipSide {
-										flipSideFound = true
-									}
+						flipSideFound := ""
+						flipSideState := ""
+						flipSide := negate[op] + move[1:]
+						for j := statei + 1; j < len(states); j++ {
+							for _, x := range moveExp[states[j]] {
+								if x == flipSide {
+									flipSideFound = flipSide
+									flipSideState = states[j]
 								}
 							}
 						}
 
-						if !flipSideFound {
-							stateExp := state
+						stateExp := state
+						if flipSideFound != "" {
+							if op == "-" {
+								stateExp = flipSideState
+							}
+						} else {
 							if op == "-" {
 								stateExp = ""
 							}
+						}
 
-							if moveGot.State != stateExp {
-								t.Errorf("i: %d, not stateExp: %q,"+
-									" before: %#v, after: %#v,"+
-									" movesExp: %#v, movesGot: %#v,"+
-									" test: %#v",
-									i, stateExp, before, after,
-									movesExp, movesGot, test)
-							}
+						if moveGot.State != stateExp {
+							t.Errorf("testi: %d, not stateExp: %q,"+
+								" before: %#v, after: %#v,"+
+								" movesExp: %#v, movesGot: %#v,"+
+								" test: %#v, move: %s,"+
+								" flipSideFound: %q, flipSideState: %q",
+								testi, stateExp, before, after,
+								movesExp, movesGot, test, move,
+								flipSideFound, flipSideState)
 						}
 					}
 				}
