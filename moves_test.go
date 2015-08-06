@@ -229,6 +229,12 @@ func TestCalcPartitionMoves(t *testing.T) {
 			     c |-b  d`,
 			"    c |    d",
 		},
+		{
+			" a    |    b",
+			`-a    |+a  b
+			       | a  b +c`,
+			"      | a  b  c",
+		},
 	}
 
 	negate := map[string]string{
