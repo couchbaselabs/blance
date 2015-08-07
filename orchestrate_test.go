@@ -83,7 +83,7 @@ func TestOrchestrateMoves(t *testing.T) {
 			expectErr: nil,
 		},
 		{
-			label:          "add node a",
+			label:          "add node a, 1 partition",
 			partitionModel: mrPartitionModel,
 			options:        options_1_1,
 			nodesAll:       []string{"a"},
@@ -104,6 +104,66 @@ func TestOrchestrateMoves(t *testing.T) {
 			expectAssignPartitions: []assignPartitionRec{
 				assignPartitionRec{
 					partition: "00", node: "a", state: "master",
+				},
+			},
+			expectErr: nil,
+		},
+		{
+			label:          "add node a & b, 1 partition",
+			partitionModel: mrPartitionModel,
+			options:        options_1_1,
+			nodesAll:       []string{"a", "b"},
+			begMap: PartitionMap{
+				"00": &Partition{
+					Name:         "00",
+					NodesByState: map[string][]string{},
+				},
+			},
+			endMap: PartitionMap{
+				"00": &Partition{
+					Name: "00",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+						"replica": []string{"b"},
+					},
+				},
+			},
+			expectAssignPartitions: []assignPartitionRec{
+				assignPartitionRec{
+					partition: "00", node: "a", state: "master",
+				},
+				assignPartitionRec{
+					partition: "00", node: "b", state: "replica",
+				},
+			},
+			expectErr: nil,
+		},
+		{
+			label:          "add node a & b & c, 1 partition",
+			partitionModel: mrPartitionModel,
+			options:        options_1_1,
+			nodesAll:       []string{"a", "b", "c"},
+			begMap: PartitionMap{
+				"00": &Partition{
+					Name:         "00",
+					NodesByState: map[string][]string{},
+				},
+			},
+			endMap: PartitionMap{
+				"00": &Partition{
+					Name: "00",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+						"replica": []string{"b"},
+					},
+				},
+			},
+			expectAssignPartitions: []assignPartitionRec{
+				assignPartitionRec{
+					partition: "00", node: "a", state: "master",
+				},
+				assignPartitionRec{
+					partition: "00", node: "b", state: "replica",
 				},
 			},
 			expectErr: nil,
