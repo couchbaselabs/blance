@@ -174,7 +174,10 @@ func OrchestrateMoves(
 			go func(node string) {
 				o.m.Lock()
 				o.progress.TotRunMover++
+				progress := o.progress
 				o.m.Unlock()
+
+				o.progressCh <- progress
 
 				runMoverDoneCh <- o.runMover(node, stopCh)
 			}(node)
