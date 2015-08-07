@@ -22,9 +22,8 @@ func TestOrchestrateMoves(t *testing.T) {
 		},
 	}
 
-	options_1_1 := OrchestratorOptions{
-		MaxConcurrentPartitionBuildsPerCluster: 1,
-		MaxConcurrentPartitionBuildsPerNode:    1,
+	options1 := OrchestratorOptions{
+		MaxConcurrentPartitionMovesPerNode: 1,
 	}
 
 	tests := []struct {
@@ -42,7 +41,7 @@ func TestOrchestrateMoves(t *testing.T) {
 		{
 			label:          "do nothing",
 			partitionModel: mrPartitionModel,
-			options:        options_1_1,
+			options:        options1,
 			nodesAll:       []string(nil),
 			begMap:         PartitionMap{},
 			endMap:         PartitionMap{},
@@ -51,7 +50,7 @@ func TestOrchestrateMoves(t *testing.T) {
 		{
 			label:          "1 node, no assignments or changes",
 			partitionModel: mrPartitionModel,
-			options:        options_1_1,
+			options:        options1,
 			nodesAll:       []string{"a"},
 			begMap:         PartitionMap{},
 			endMap:         PartitionMap{},
@@ -60,7 +59,7 @@ func TestOrchestrateMoves(t *testing.T) {
 		{
 			label:          "no nodes, but some partitions",
 			partitionModel: mrPartitionModel,
-			options:        options_1_1,
+			options:        options1,
 			nodesAll:       []string(nil),
 			begMap: PartitionMap{
 				"00": &Partition{
@@ -87,7 +86,7 @@ func TestOrchestrateMoves(t *testing.T) {
 		{
 			label:          "add node a, 1 partition",
 			partitionModel: mrPartitionModel,
-			options:        options_1_1,
+			options:        options1,
 			nodesAll:       []string{"a"},
 			begMap: PartitionMap{
 				"00": &Partition{
@@ -113,7 +112,7 @@ func TestOrchestrateMoves(t *testing.T) {
 		{
 			label:          "add node a & b, 1 partition",
 			partitionModel: mrPartitionModel,
-			options:        options_1_1,
+			options:        options1,
 			nodesAll:       []string{"a", "b"},
 			begMap: PartitionMap{
 				"00": &Partition{
@@ -143,7 +142,7 @@ func TestOrchestrateMoves(t *testing.T) {
 		{
 			label:          "add node a & b & c, 1 partition",
 			partitionModel: mrPartitionModel,
-			options:        options_1_1,
+			options:        options1,
 			nodesAll:       []string{"a", "b", "c"},
 			begMap: PartitionMap{
 				"00": &Partition{
@@ -173,7 +172,7 @@ func TestOrchestrateMoves(t *testing.T) {
 		{
 			label:          "del node a, 1 partition",
 			partitionModel: mrPartitionModel,
-			options:        options_1_1,
+			options:        options1,
 			nodesAll:       []string{"a"},
 			begMap: PartitionMap{
 				"00": &Partition{
@@ -190,6 +189,37 @@ func TestOrchestrateMoves(t *testing.T) {
 				},
 			},
 			expectAssignPartitions: []assignPartitionRec{
+				assignPartitionRec{
+					partition: "00", node: "a", state: "",
+				},
+			},
+			expectErr: nil,
+		},
+		{
+			label:          "swap a to b, 1 partition",
+			partitionModel: mrPartitionModel,
+			options:        options1,
+			nodesAll:       []string{"a", "b"},
+			begMap: PartitionMap{
+				"00": &Partition{
+					Name:         "00",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+					},
+				},
+			},
+			endMap: PartitionMap{
+				"00": &Partition{
+					Name: "00",
+					NodesByState: map[string][]string{
+						"master": []string{"b"},
+					},
+				},
+			},
+			expectAssignPartitions: []assignPartitionRec{
+				assignPartitionRec{
+					partition: "00", node: "b", state: "master",
+				},
 				assignPartitionRec{
 					partition: "00", node: "a", state: "",
 				},

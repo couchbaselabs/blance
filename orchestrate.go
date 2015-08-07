@@ -49,8 +49,7 @@ type Orchestrator struct {
 }
 
 type OrchestratorOptions struct {
-	MaxConcurrentPartitionBuildsPerCluster int
-	MaxConcurrentPartitionBuildsPerNode    int
+	MaxConcurrentPartitionMovesPerNode int
 }
 
 type OrchestratorProgress struct {
@@ -115,8 +114,10 @@ func OrchestrateMoves(
 	assignPartition AssignPartitionFunc,
 	partitionState PartitionStateFunc,
 ) (*Orchestrator, error) {
-	m := options.MaxConcurrentPartitionBuildsPerCluster
-	n := options.MaxConcurrentPartitionBuildsPerNode
+	m := options.MaxConcurrentPartitionMovesPerNode
+	if m < 1 {
+		m = 1
+	}
 
 	// The mapNodeToPartitionMoveCh is keyed by node name.
 	mapNodeToPartitionMoveCh := map[string]chan partitionMove{}
@@ -153,8 +154,8 @@ func OrchestrateMoves(
 		assignPartition: assignPartition,
 		partitionState:  partitionState,
 		progressCh:      make(chan OrchestratorProgress),
-		tokensSupplyCh:  make(chan int, m),
-		tokensReleaseCh: make(chan int, m),
+		tokensSupplyCh:  make(chan int, len(nodesAll)*m),
+		tokensReleaseCh: make(chan int, len(nodesAll)*m),
 
 		mapNodeToPartitionMoveCh: mapNodeToPartitionMoveCh,
 
@@ -170,7 +171,7 @@ func OrchestrateMoves(
 
 	// Start concurrent movers.
 	for _, node := range o.nodesAll {
-		for i := 0; i < n; i++ {
+		for i := 0; i < m; i++ {
 			go func(node string) {
 				o.m.Lock()
 				o.progress.TotRunMover++
@@ -185,13 +186,13 @@ func OrchestrateMoves(
 	}
 
 	// Supply tokens to movers.
-	go o.runSupplyTokens(m)
+	go o.runSupplyTokens(len(nodesAll)*m)
 
 	// Supply moves to movers.
 	go o.runSupplyMoves(stopCh)
 
 	go func() { // Wait for movers to finish and then cleanup.
-		for i := 0; i < len(o.nodesAll)*n; i++ {
+		for i := 0; i < len(o.nodesAll)*m; i++ {
 			err := <-runMoverDoneCh
 
 			o.m.Lock()
