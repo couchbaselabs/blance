@@ -67,21 +67,19 @@ type OrchestratorProgress struct {
 }
 
 // AssignPartitionFunc is a callback invoked by OrchestrateMoves()
-// when it wants to asynchronously assign a partition to a node.
+// when it wants to asynchronously assign a partition to a node at a
+// given state, or change the state of an existing partition on a
+// node.
 type AssignPartitionFunc func(
 	partition string,
 	node string,
-	state string,
-	insertAt int,
-	fromNode string,
-	fromNodeTakeOver bool) error
+	state string) error
 
 // UnassignPartitionFunc is a callback invoked by OrchestrateMoves()
 // when it wants to asynchronously remove a partition from a node.
 type UnassignPartitionFunc func(
 	partition string,
-	node string,
-	state string) error
+	node string) error
 
 // UnassignPartitionFunc is a callback invoked by OrchestrateMoves()
 // when it wants to synchronously retrieve information about a
@@ -90,7 +88,6 @@ type PartitionStateFunc func(
 	partition string,
 	node string) (
 	state string,
-	position int,
 	pct float32,
 	err error)
 
@@ -284,40 +281,26 @@ func (o *Orchestrator) runMover(node string, stopCh chan struct{}) error {
 				return nil
 			}
 
-			partition, state, insertAt, fromNode, fromNodeTakeOver, err :=
-				o.nextMove(node)
+			partition, state, op, err := o.nextMove(node)
 			if err != nil || partition == "" {
 				o.tokensReleaseCh <- token
 				return err
 			}
 
-			err = o.assignPartition(partition, node, state,
-				insertAt, fromNode, fromNodeTakeOver)
+			if op != "del" {
+				err = o.assignPartition(partition, node, state)
+			} else {
+				err = o.unassignPartition(partition, node)
+			}
 			if err != nil {
 				o.tokensReleaseCh <- token
 				return err
 			}
 
-			err = o.waitForPartitionNodeState(partition,
-				node, state, insertAt)
+			err = o.waitForPartitionNodeState(partition, node, state)
 			if err != nil {
 				o.tokensReleaseCh <- token
 				return err
-			}
-
-			if fromNode != "" {
-				err = o.unassignPartition(partition, node, state)
-				if err != nil {
-					o.tokensReleaseCh <- token
-					return err
-				}
-
-				err = o.waitForPartitionNodeState(partition,
-					node, "", -1)
-				if err != nil {
-					o.tokensReleaseCh <- token
-					return err
-				}
 			}
 
 			o.tokensReleaseCh <- token
@@ -328,19 +311,16 @@ func (o *Orchestrator) runMover(node string, stopCh chan struct{}) error {
 }
 
 func (o *Orchestrator) nextMove(node string) (
-	partition string,
-	state string,
-	insertAt int,
-	fromNode string,
-	fromNodeTakeOver bool,
-	err error) {
+	partition string, state string, op string, err error) {
 	partitionMove, ok := <-o.mapNodeToPartitionMoveCh[node]
 	if !ok {
-		return "", "", -1, "", false, nil
+		return "", "", "", nil
 	}
 
-	return partitionMove.partition, partitionMove.state,
-		-1, "", false, nil
+	return partitionMove.partition,
+		partitionMove.state,
+		partitionMove.op,
+		nil
 }
 
 func (o *Orchestrator) runSupplyTokens(numStartTokens int) {
@@ -500,8 +480,7 @@ func (a *nextMovesSorter) Swap(i, j int) {
 func (o *Orchestrator) waitForPartitionNodeState(
 	partition string,
 	node string,
-	state string,
-	position int) error {
+	state string) error {
 	// TODO.
 	return nil
 }
