@@ -434,6 +434,8 @@ var opWeight = map[string]int{
 }
 
 func findBestNextMoves(nextMovesArr []*nextMoves) *nextMoves {
+	// Simple implementation right now just favors promotions, then
+	// demotions, then adds, then dels (removals).
 	r := nextMovesArr[0]
 	for _, x := range nextMovesArr {
 		if opWeight[r.moves[r.next].Op] >
