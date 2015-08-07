@@ -5,7 +5,14 @@ import (
 )
 
 func TestOrchestrateMoves(t *testing.T) {
-	var partitionModel PartitionModel
+	partitionModel := PartitionModel{
+		"master": &PartitionModelState{
+			Priority: 0,
+		},
+		"replica": &PartitionModelState{
+			Constraints: 1,
+		},
+	}
 
 	options := OrchestratorOptions{
 		MaxConcurrentPartitionBuildsPerCluster: 1,
