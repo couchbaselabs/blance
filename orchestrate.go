@@ -12,7 +12,6 @@
 package blance
 
 import (
-	"sort"
 	"sync"
 )
 
@@ -372,9 +371,6 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 		nodeFeedersDoneCh := make(chan bool)
 
 		for node, nextMovesArr := range availableMoves {
-			// TODO: Can optimize by finding least instead of full sort.
-			sort.Sort(&nextMovesSorter{nextMovesArr})
-
 			go func(node string, nextMoves *nextMoves) {
 				o.m.Lock()
 				nodeStateOp := nextMoves.moves[nextMoves.next]
@@ -405,7 +401,7 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 				}
 
 				nodeFeedersDoneCh <- false
-			}(node, nextMovesArr[0])
+			}(node, findBestNextMoves(nextMovesArr))
 		}
 
 		nodeFeedersStopChClosed := false
@@ -437,23 +433,15 @@ var opWeight = map[string]int{
 	"del":     3,
 }
 
-type nextMovesSorter struct {
-	s []*nextMoves
-}
-
-func (a *nextMovesSorter) Len() int {
-	return len(a.s)
-}
-
-func (a *nextMovesSorter) Less(i, j int) bool {
-	opi := a.s[i].moves[a.s[i].next].Op
-	opj := a.s[j].moves[a.s[j].next].Op
-
-	return opWeight[opi] < opWeight[opj]
-}
-
-func (a *nextMovesSorter) Swap(i, j int) {
-	a.s[i], a.s[j] = a.s[j], a.s[i]
+func findBestNextMoves(nextMovesArr []*nextMoves) *nextMoves {
+	r := nextMovesArr[0]
+	for _, x := range nextMovesArr {
+		if opWeight[r.moves[r.next].Op] >
+			opWeight[x.moves[x.next].Op] {
+			r = x
+		}
+	}
+	return r
 }
 
 func (o *Orchestrator) waitForPartitionNodeState(
