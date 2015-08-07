@@ -55,6 +55,33 @@ func TestOrchestrateMoves(t *testing.T) {
 			endMap:         PartitionMap{},
 			expectErr:      nil,
 		},
+		{
+			label:          "no nodes, but some partitions",
+			partitionModel: mrPartitionModel,
+			options:        options_1_1,
+			nodesAll:       []string(nil),
+			begMap: PartitionMap{
+				"00": &Partition{
+					Name:         "00",
+					NodesByState: map[string][]string{},
+				},
+				"01": &Partition{
+					Name:         "01",
+					NodesByState: map[string][]string{},
+				},
+			},
+			endMap: PartitionMap{
+				"00": &Partition{
+					Name:         "00",
+					NodesByState: map[string][]string{},
+				},
+				"01": &Partition{
+					Name:         "01",
+					NodesByState: map[string][]string{},
+				},
+			},
+			expectErr: nil,
+		},
 	}
 
 	for testi, test := range tests {
@@ -97,15 +124,20 @@ func TestOrchestrateMoves(t *testing.T) {
 		}
 
 		for range o.ProgressCh() {
+			// TODO: Should check for expected progress.
 		}
 
 		if len(assignPartitionRecs) != len(test.expectAssignPartitions) {
 			t.Errorf("testi: %d, label: %s,"+
 				" len(assignPartitionRecs == %d)"+
-				" != len(test.expectAssignPartitions == %d)",
+				" != len(test.expectAssignPartitions == %d),"+
+				" assignPartitionRecs: %#v,"+
+				" test.expectAssignPartitions: %#v",
 				testi, test.label,
 				len(assignPartitionRecs),
-				len(test.expectAssignPartitions))
+				len(test.expectAssignPartitions),
+				assignPartitionRecs,
+				test.expectAssignPartitions)
 		}
 
 		for eapi, eap := range test.expectAssignPartitions {
