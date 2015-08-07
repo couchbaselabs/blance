@@ -82,6 +82,32 @@ func TestOrchestrateMoves(t *testing.T) {
 			},
 			expectErr: nil,
 		},
+		{
+			label:          "add node a",
+			partitionModel: mrPartitionModel,
+			options:        options_1_1,
+			nodesAll:       []string{"a"},
+			begMap: PartitionMap{
+				"00": &Partition{
+					Name:         "00",
+					NodesByState: map[string][]string{},
+				},
+			},
+			endMap: PartitionMap{
+				"00": &Partition{
+					Name: "00",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+					},
+				},
+			},
+			expectAssignPartitions: []assignPartitionRec{
+				assignPartitionRec{
+					partition: "00", node: "a", state: "master",
+				},
+			},
+			expectErr: nil,
+		},
 	}
 
 	for testi, test := range tests {
