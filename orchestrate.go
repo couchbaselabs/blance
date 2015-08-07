@@ -29,8 +29,6 @@ type Orchestrator struct {
 	begMap PartitionMap
 	endMap PartitionMap
 
-	movesByPartition map[string][]NodeStateOp
-
 	assignPartition   AssignPartitionFunc
 	unassignPartition UnassignPartitionFunc
 	partitionState    PartitionStateFunc
@@ -40,11 +38,15 @@ type Orchestrator struct {
 	tokensSupplyCh  chan int
 	tokensReleaseCh chan int
 
+	mapNodeToPartitionMoveCh map[string]chan partitionMove
+
 	m sync.Mutex // Protects the fields that follow.
 
 	stopCh   chan struct{} // Becomes nil when stopped.
 	pauseCh  chan struct{} // May be nil; non-nil when paused.
 	progress OrchestratorProgress
+
+	mapPartitionToNextMoves map[string]nextMoves
 }
 
 type OrchestratorOptions struct {
@@ -91,6 +93,22 @@ type PartitionStateFunc func(
 	pct float32,
 	err error)
 
+// ------------------------------------------
+
+type partitionMove struct {
+	idx       int // Position of this move in nextMoves.
+	partition string
+	state     string
+	op        string // See NodeStateOp.Op field.
+}
+
+type nextMoves struct {
+	next  int // An index into the moves array that is our next move.
+	moves []NodeStateOp
+}
+
+// ------------------------------------------
+
 // OrchestratorMoves asynchronously begins reassigning partitions
 // amongst nodes to transition from the begMap to the endMap state,
 // invoking the callback functions like assignPartition() and
@@ -111,14 +129,16 @@ func OrchestrateMoves(
 	m := options.MaxConcurrentPartitionBuildsPerCluster
 	n := options.MaxConcurrentPartitionBuildsPerNode
 
-	nodeChs := map[string]chan NodeStateOp{}
+	// The mapNodeToPartitionMoveCh is keyed by node name.
+	mapNodeToPartitionMoveCh := map[string]chan partitionMove{}
 	for _, node := range nodesAll {
-		nodeChs[node] = make(chan NodeStateOp)
+		mapNodeToPartitionMoveCh[node] = make(chan partitionMove)
 	}
 
 	states := sortStateNames(model)
 
-	movesByPartition := map[string][]NodeStateOp{}
+	// The mapPartitionToNextMoves is keyed by partition name.
+	mapPartitionToNextMoves := map[string]nextMoves{}
 
 	for partitionName, begPartition := range begMap {
 		endPartition := endMap[partitionName]
@@ -127,15 +147,10 @@ func OrchestrateMoves(
 			begPartition.NodesByState,
 			endPartition.NodesByState)
 
-		movesByPartition[partitionName] = moves
-
-		// go func(moves []NodeState) {
-		// 	for _, move := range moves {
-		//      // This ends up using goroutine (random) scheduling
-		//      // to schedule these moves.
-		// 		nodeChs[move.Node] <- move
-		// 	}
-		// }(moves)
+		mapPartitionToNextMoves[partitionName] = nextMoves{
+			next:  0,
+			moves: moves,
+		}
 	}
 
 	o := &Orchestrator{
@@ -145,15 +160,19 @@ func OrchestrateMoves(
 		nodesAll:          nodesAll,
 		begMap:            begMap,
 		endMap:            endMap,
-		movesByPartition:  movesByPartition,
 		assignPartition:   assignPartition,
 		unassignPartition: unassignPartition,
 		partitionState:    partitionState,
 		progressCh:        make(chan OrchestratorProgress),
-		stopCh:            make(chan struct{}),
-		pauseCh:           nil,
 		tokensSupplyCh:    make(chan int, m),
 		tokensReleaseCh:   make(chan int, m),
+
+		mapNodeToPartitionMoveCh: mapNodeToPartitionMoveCh,
+
+		stopCh:  make(chan struct{}),
+		pauseCh: nil,
+
+		mapPartitionToNextMoves: mapPartitionToNextMoves,
 	}
 
 	stopCh := o.stopCh

@@ -15,8 +15,8 @@ package blance
 // array of NodeStateOp's could be interpreted as a series of
 // node-by-node state transitions for a partition.  For example, for
 // partition X, the NodeState transitions might be: first add node A
-// to "master", then demote node B to "replica", then remove (or sub)
-// partition X from node C (its state will be "").
+// to "master", then demote node B to "replica", then remove (or del)
+// partition X from node C.
 type NodeStateOp struct {
 	Node  string
 	State string
