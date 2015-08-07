@@ -30,9 +30,8 @@ type Orchestrator struct {
 	begMap PartitionMap
 	endMap PartitionMap
 
-	assignPartition   AssignPartitionFunc
-	unassignPartition UnassignPartitionFunc
-	partitionState    PartitionStateFunc
+	assignPartition AssignPartitionFunc
+	partitionState  PartitionStateFunc
 
 	progressCh chan OrchestratorProgress
 
@@ -69,17 +68,12 @@ type OrchestratorProgress struct {
 // AssignPartitionFunc is a callback invoked by OrchestrateMoves()
 // when it wants to asynchronously assign a partition to a node at a
 // given state, or change the state of an existing partition on a
-// node.
+// node.  The state will be "" if the partition should be removed or
+// deleted from the ndoe.
 type AssignPartitionFunc func(
 	partition string,
 	node string,
 	state string) error
-
-// UnassignPartitionFunc is a callback invoked by OrchestrateMoves()
-// when it wants to asynchronously remove a partition from a node.
-type UnassignPartitionFunc func(
-	partition string,
-	node string) error
 
 // PartitionStateFunc is a callback invoked by OrchestrateMoves()
 // when it wants to synchronously retrieve information about a
@@ -109,9 +103,8 @@ type nextMoves struct {
 
 // OrchestratorMoves asynchronously begins reassigning partitions
 // amongst nodes to transition from the begMap to the endMap state,
-// invoking the callback functions like assignPartition() and
-// unassignPartition() to affect changes.  Additionally, the caller
-// must read the progress channel until it's closed by
+// invoking the assignPartition() to affect changes.  Additionally,
+// the caller must read the progress channel until it's closed by
 // OrchestrateMoves to avoid blocking the orchestration.
 func OrchestrateMoves(
 	label string,
@@ -121,7 +114,6 @@ func OrchestrateMoves(
 	begMap PartitionMap,
 	endMap PartitionMap,
 	assignPartition AssignPartitionFunc,
-	unassignPartition UnassignPartitionFunc,
 	partitionState PartitionStateFunc,
 ) (*Orchestrator, error) {
 	m := options.MaxConcurrentPartitionBuildsPerCluster
@@ -153,18 +145,17 @@ func OrchestrateMoves(
 	}
 
 	o := &Orchestrator{
-		label:             label,
-		model:             model,
-		options:           options,
-		nodesAll:          nodesAll,
-		begMap:            begMap,
-		endMap:            endMap,
-		assignPartition:   assignPartition,
-		unassignPartition: unassignPartition,
-		partitionState:    partitionState,
-		progressCh:        make(chan OrchestratorProgress),
-		tokensSupplyCh:    make(chan int, m),
-		tokensReleaseCh:   make(chan int, m),
+		label:           label,
+		model:           model,
+		options:         options,
+		nodesAll:        nodesAll,
+		begMap:          begMap,
+		endMap:          endMap,
+		assignPartition: assignPartition,
+		partitionState:  partitionState,
+		progressCh:      make(chan OrchestratorProgress),
+		tokensSupplyCh:  make(chan int, m),
+		tokensReleaseCh: make(chan int, m),
 
 		mapNodeToPartitionMoveCh: mapNodeToPartitionMoveCh,
 
@@ -281,23 +272,19 @@ func (o *Orchestrator) runMover(node string, stopCh chan struct{}) error {
 				return nil
 			}
 
-			partition, state, op, err := o.nextMove(node)
+			partition, state, err := o.nextMove(node)
 			if err != nil || partition == "" {
 				o.tokensReleaseCh <- token
 				return err
 			}
 
-			if op != "del" {
-				err = o.assignPartition(partition, node, state)
-			} else {
-				err = o.unassignPartition(partition, node)
-			}
+			err = o.assignPartition(partition, node, state)
 			if err != nil {
 				o.tokensReleaseCh <- token
 				return err
 			}
 
-			err = o.waitForPartitionNodeState(partition, node, state)
+			err = o.waitForPartitionNodeState(stopCh, partition, node, state)
 			if err != nil {
 				o.tokensReleaseCh <- token
 				return err
@@ -311,16 +298,13 @@ func (o *Orchestrator) runMover(node string, stopCh chan struct{}) error {
 }
 
 func (o *Orchestrator) nextMove(node string) (
-	partition string, state string, op string, err error) {
+	partition string, state string, err error) {
 	partitionMove, ok := <-o.mapNodeToPartitionMoveCh[node]
 	if !ok {
-		return "", "", "", nil
+		return "", "", nil
 	}
 
-	return partitionMove.partition,
-		partitionMove.state,
-		partitionMove.op,
-		nil
+	return partitionMove.partition, partitionMove.state, nil
 }
 
 func (o *Orchestrator) runSupplyTokens(numStartTokens int) {
