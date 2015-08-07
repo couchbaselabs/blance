@@ -46,7 +46,7 @@ type Orchestrator struct {
 	pauseCh  chan struct{} // May be nil; non-nil when paused.
 	progress OrchestratorProgress
 
-	mapPartitionToNextMoves map[string]nextMoves
+	mapPartitionToNextMoves map[string]*nextMoves
 }
 
 type OrchestratorOptions struct {
@@ -138,7 +138,7 @@ func OrchestrateMoves(
 	states := sortStateNames(model)
 
 	// The mapPartitionToNextMoves is keyed by partition name.
-	mapPartitionToNextMoves := map[string]nextMoves{}
+	mapPartitionToNextMoves := map[string]*nextMoves{}
 
 	for partitionName, begPartition := range begMap {
 		endPartition := endMap[partitionName]
@@ -147,7 +147,7 @@ func OrchestrateMoves(
 			begPartition.NodesByState,
 			endPartition.NodesByState)
 
-		mapPartitionToNextMoves[partitionName] = nextMoves{
+		mapPartitionToNextMoves[partitionName] = &nextMoves{
 			next:  0,
 			moves: moves,
 		}
@@ -194,6 +194,9 @@ func OrchestrateMoves(
 
 	// Supply tokens to movers.
 	go o.runTokens(m)
+
+	// Feed moves to the movers.
+	go o.runPartitionMoveFeeder()
 
 	go func() { // Wait for movers to finish and then cleanup.
 		for i := 0; i < len(o.nodesAll)*n; i++ {
@@ -323,7 +326,7 @@ func (o *Orchestrator) runMover(node string, stopCh chan struct{}) error {
 			}
 
 			partition, state, insertAt, fromNode, fromNodeTakeOver, err :=
-				o.calcNextPartitionToAssignToNode(node)
+				o.nextPartitionMove(node)
 			if err != nil || partition == "" {
 				o.tokensReleaseCh <- token
 				return err
@@ -365,7 +368,7 @@ func (o *Orchestrator) runMover(node string, stopCh chan struct{}) error {
 	return nil
 }
 
-func (o *Orchestrator) calcNextPartitionToAssignToNode(node string) (
+func (o *Orchestrator) nextPartitionMove(node string) (
 	partition string,
 	state string,
 	insertAt int,
@@ -379,6 +382,26 @@ func (o *Orchestrator) calcNextPartitionToAssignToNode(node string) (
 
 	return partitionMove.partition, partitionMove.state,
 		-1, "", false, nil
+}
+
+func (o *Orchestrator) runPartitionMoveFeeder() {
+	for {
+		found := false
+		for partitionName, nextMoves := range o.mapPartitionToNextMoves {
+			if partitionName == "" || nextMoves == nil {
+			}
+		}
+
+		// TODO. And possibly the wrong structural flows.
+
+		if found == false {
+			break
+		}
+	}
+
+	for _, partitionMoveCh := range o.mapNodeToPartitionMoveCh {
+		close(partitionMoveCh)
+	}
 }
 
 func (o *Orchestrator) waitForPartitionNodeState(
