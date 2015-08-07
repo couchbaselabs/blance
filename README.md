@@ -11,7 +11,7 @@ inclusion/exclusion policies, heterogeneous partition weights,
 heterogeneous node weights, partition stickiness control, and multi-master
 support.
 
-[![GoDoc](https://godoc.org/github.com/couchbaselabs/blance?status.svg)](https://godoc.org/github.com/couchbaselabs/blance)
+[![Build Status](https://travis-ci.org/couchbaselabs/blance.svg)](https://travis-ci.org/couchbaselabs/blance) [![GoDoc](https://godoc.org/github.com/couchbaselabs/blance?status.svg)](https://godoc.org/github.com/couchbaselabs/blance)
 
 LICENSE: Apache 2.0
 
