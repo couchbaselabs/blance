@@ -26,34 +26,34 @@ func TestOrchestrateMoves(t *testing.T) {
 		MaxConcurrentPartitionBuildsPerNode:    1,
 	}
 
-	tests := []struct{
-		label           string
-		partitionModel  PartitionModel
-		options         OrchestratorOptions
-		nodesAll        []string
-		begMap          PartitionMap
-		endMap          PartitionMap
-		expectErr       error
+	tests := []struct {
+		label          string
+		partitionModel PartitionModel
+		options        OrchestratorOptions
+		nodesAll       []string
+		begMap         PartitionMap
+		endMap         PartitionMap
+		expectErr      error
 
 		expectAssignPartitions []assignPartitionRec
 	}{
 		{
-			label:           "do nothing",
-			partitionModel:  mrPartitionModel,
-			options:         options_1_1,
-			nodesAll:        []string(nil),
-			begMap:          PartitionMap{},
-			endMap:          PartitionMap{},
-			expectErr:       nil,
+			label:          "do nothing",
+			partitionModel: mrPartitionModel,
+			options:        options_1_1,
+			nodesAll:       []string(nil),
+			begMap:         PartitionMap{},
+			endMap:         PartitionMap{},
+			expectErr:      nil,
 		},
 		{
-			label:           "1 node, no assignments or changes",
-			partitionModel:  mrPartitionModel,
-			options:         options_1_1,
-			nodesAll:        []string{"a"},
-			begMap:          PartitionMap{},
-			endMap:          PartitionMap{},
-			expectErr:       nil,
+			label:          "1 node, no assignments or changes",
+			partitionModel: mrPartitionModel,
+			options:        options_1_1,
+			nodesAll:       []string{"a"},
+			begMap:         PartitionMap{},
+			endMap:         PartitionMap{},
+			expectErr:      nil,
 		},
 	}
 
