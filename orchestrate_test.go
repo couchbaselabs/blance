@@ -5,7 +5,7 @@ import (
 )
 
 func TestOrchestrateMoves(t *testing.T) {
-	partitionModel := PartitionModel{
+	mrPartitionModel := PartitionModel{
 		"master": &PartitionModelState{
 			Priority: 0,
 		},
@@ -14,33 +14,62 @@ func TestOrchestrateMoves(t *testing.T) {
 		},
 	}
 
-	options := OrchestratorOptions{
+	options_1_1 := OrchestratorOptions{
 		MaxConcurrentPartitionBuildsPerCluster: 1,
 		MaxConcurrentPartitionBuildsPerNode:    1,
 	}
 
-	var nodesAll []string
-	var begMap PartitionMap
-	var endMap PartitionMap
-	var assignPartition AssignPartitionFunc
-	var partitionState PartitionStateFunc
-
-	o, err := OrchestrateMoves("label",
-		partitionModel,
-		options,
-		nodesAll,
-		begMap,
-		endMap,
-		assignPartition,
-		partitionState)
-	if err != nil || o == nil {
-		t.Errorf("expected o and no err")
+	tests := []struct{
+		label           string
+		partitionModel  PartitionModel
+		options         OrchestratorOptions
+		nodesAll        []string
+		begMap          PartitionMap
+		endMap          PartitionMap
+		assignPartition AssignPartitionFunc
+		partitionState  PartitionStateFunc
+		expErr          error
+	}{
+		{
+			label:           "label",
+			partitionModel:  mrPartitionModel,
+			options:         options_1_1,
+			nodesAll:        []string(nil),
+			begMap:          PartitionMap{},
+			endMap:          PartitionMap{},
+			assignPartition: nil,
+			partitionState:  nil,
+		},
 	}
 
-	o.Stop()
+	for testi, test := range tests {
+		o, err := OrchestrateMoves(test.label,
+			test.partitionModel,
+			test.options,
+			test.nodesAll,
+			test.begMap,
+			test.endMap,
+			test.assignPartition,
+			test.partitionState)
+		if o == nil {
+			t.Errorf("testi: %d, label: %s,"+
+				" expected o",
+				testi, test.label)
+		}
+		if err != test.expErr {
+			t.Errorf("testi: %d, label: %s,"+
+				"expected err: %v, got: %v",
+				testi, test.label,
+				test.expErr, err)
+		}
 
-	_, ok := <-o.ProgressCh()
-	if ok {
-		t.Errorf("expected progress to be closed")
+		o.Stop()
+
+		_, ok := <-o.ProgressCh()
+		if ok {
+			t.Errorf("testi: %d, label: %s,"+
+				"expected progress to be closed",
+				testi, test.label)
+		}
 	}
 }
