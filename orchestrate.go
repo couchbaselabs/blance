@@ -311,12 +311,7 @@ func (o *Orchestrator) runSupplyTokens(numStartTokens int) {
 	defer close(o.tokensSupplyCh)
 
 	for i := 0; i < numStartTokens; i++ {
-		// Tokens available to throttle concurrency.  The # of
-		// outstanding tokens might be changed dynamically and can
-		// also be used to synchronize with any optional, external
-		// manager (i.e., ns-server wants cbft to do X number of moves
-		// with M concurrency before forcing a cluster-wide
-		// compaction).
+		// Tokens available to throttle concurrency.
 		o.tokensSupplyCh <- i
 	}
 
@@ -462,6 +457,7 @@ func (a *nextMovesSorter) Swap(i, j int) {
 }
 
 func (o *Orchestrator) waitForPartitionNodeState(
+	stopCh chan struct{},
 	partition string,
 	node string,
 	state string) error {
