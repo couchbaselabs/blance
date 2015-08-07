@@ -5,6 +5,12 @@ import (
 	"testing"
 )
 
+type assignPartitionRec struct {
+	partition string
+	node      string
+	state     string
+}
+
 func TestOrchestrateMoves(t *testing.T) {
 	mrPartitionModel := PartitionModel{
 		"master": &PartitionModelState{
@@ -28,6 +34,8 @@ func TestOrchestrateMoves(t *testing.T) {
 		begMap          PartitionMap
 		endMap          PartitionMap
 		expectErr       error
+
+		expectAssignPartitions []assignPartitionRec
 	}{
 		{
 			label:           "do nothing",
@@ -47,12 +55,6 @@ func TestOrchestrateMoves(t *testing.T) {
 			endMap:          PartitionMap{},
 			expectErr:       nil,
 		},
-	}
-
-	type assignPartitionRec struct {
-		partition string
-		node      string
-		state     string
 	}
 
 	for testi, test := range tests {
@@ -94,11 +96,29 @@ func TestOrchestrateMoves(t *testing.T) {
 				test.expectErr, err)
 		}
 
-		go func() {
-			for range o.ProgressCh() {
-			}
-		}()
+		for range o.ProgressCh() {
+		}
 
-		o.Stop()
+		if len(assignPartitionRecs) != len(test.expectAssignPartitions) {
+			t.Errorf("testi: %d, label: %s,"+
+				" len(assignPartitionRecs == %d)"+
+				" != len(test.expectAssignPartitions == %d)",
+				testi, test.label,
+				len(assignPartitionRecs),
+				len(test.expectAssignPartitions))
+		}
+
+		for eapi, eap := range test.expectAssignPartitions {
+			apr := assignPartitionRecs[eapi]
+			if eap.partition != apr.partition ||
+				eap.node != apr.node ||
+				eap.state != apr.state {
+				t.Errorf("testi: %d, label: %s,"+
+					" mismatched assignment,"+
+					" eapi: %d, eap: %#v, apr: %#v",
+					testi, test.label,
+					eapi, eap, apr)
+			}
+		}
 	}
 }
