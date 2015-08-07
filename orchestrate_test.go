@@ -1,6 +1,7 @@
 package blance
 
 import (
+	"sync"
 	"testing"
 )
 
@@ -26,50 +27,78 @@ func TestOrchestrateMoves(t *testing.T) {
 		nodesAll        []string
 		begMap          PartitionMap
 		endMap          PartitionMap
-		assignPartition AssignPartitionFunc
-		partitionState  PartitionStateFunc
-		expErr          error
+		expectErr       error
 	}{
 		{
-			label:           "label",
+			label:           "do nothing",
 			partitionModel:  mrPartitionModel,
 			options:         options_1_1,
 			nodesAll:        []string(nil),
 			begMap:          PartitionMap{},
 			endMap:          PartitionMap{},
-			assignPartition: nil,
-			partitionState:  nil,
+			expectErr:       nil,
+		},
+		{
+			label:           "1 node, no assignments or changes",
+			partitionModel:  mrPartitionModel,
+			options:         options_1_1,
+			nodesAll:        []string{"a"},
+			begMap:          PartitionMap{},
+			endMap:          PartitionMap{},
+			expectErr:       nil,
 		},
 	}
 
+	type assignPartitionRec struct {
+		partition string
+		node      string
+		state     string
+	}
+
 	for testi, test := range tests {
+		var m sync.Mutex
+
+		var assignPartitionRecs []assignPartitionRec
+
+		assignPartitionFunc := func(partition, node, state string) error {
+			m.Lock()
+			assignPartitionRecs = append(assignPartitionRecs,
+				assignPartitionRec{partition, node, state})
+			m.Unlock()
+
+			return nil
+		}
+
+		partitionStateFunc := func(partition string, node string) (
+			state string, pct float32, err error) {
+			return "", 0, nil
+		}
+
 		o, err := OrchestrateMoves(test.label,
 			test.partitionModel,
 			test.options,
 			test.nodesAll,
 			test.begMap,
 			test.endMap,
-			test.assignPartition,
-			test.partitionState)
+			assignPartitionFunc,
+			partitionStateFunc)
 		if o == nil {
 			t.Errorf("testi: %d, label: %s,"+
 				" expected o",
 				testi, test.label)
 		}
-		if err != test.expErr {
+		if err != test.expectErr {
 			t.Errorf("testi: %d, label: %s,"+
-				"expected err: %v, got: %v",
+				" expectErr: %v, got: %v",
 				testi, test.label,
-				test.expErr, err)
+				test.expectErr, err)
 		}
+
+		go func() {
+			for range o.ProgressCh() {
+			}
+		}()
 
 		o.Stop()
-
-		_, ok := <-o.ProgressCh()
-		if ok {
-			t.Errorf("testi: %d, label: %s,"+
-				"expected progress to be closed",
-				testi, test.label)
-		}
 	}
 }
