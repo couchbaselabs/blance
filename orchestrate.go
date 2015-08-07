@@ -444,7 +444,7 @@ func (o *Orchestrator) runPartitionMoveFeeder() {
 
 		stopped := false
 
-		for i := 0; i < len(availableMoves); i++ {
+		for range availableMoves {
 			wasFed := <-nodeFeedersDoneCh
 			if wasFed && !stopped {
 				close(nodeFeedersStopCh)
