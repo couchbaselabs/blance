@@ -377,7 +377,8 @@ func (o *Orchestrator) calcNextPartitionToAssignToNode(node string) (
 		return "", "", -1, "", false, nil
 	}
 
-	return partitionMove.partition, partitionMove.state, -1, "", false, nil
+	return partitionMove.partition, partitionMove.state,
+		-1, "", false, nil
 }
 
 func (o *Orchestrator) waitForPartitionNodeState(
