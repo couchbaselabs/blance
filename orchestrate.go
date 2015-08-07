@@ -198,7 +198,7 @@ func OrchestrateMoves(
 	go o.runTokens(m)
 
 	// Feed moves to the movers.
-	go o.runPartitionMoveFeeder()
+	go o.runPartitionMoveFeeder(stopCh)
 
 	go func() { // Wait for movers to finish and then cleanup.
 		for i := 0; i < len(o.nodesAll)*n; i++ {
@@ -386,8 +386,10 @@ func (o *Orchestrator) nextPartitionMove(node string) (
 		-1, "", false, nil
 }
 
-func (o *Orchestrator) runPartitionMoveFeeder() {
-	for {
+func (o *Orchestrator) runPartitionMoveFeeder(stopCh chan struct{}) {
+	keepGoing := true
+
+	for keepGoing {
 		// The availableMoves is keyed by node name.
 		availableMoves := map[string][]*nextMoves{}
 
@@ -426,6 +428,11 @@ func (o *Orchestrator) runPartitionMoveFeeder() {
 				}
 
 				select {
+				case <-stopCh:
+					o.m.Lock()
+					keepGoing = false
+					o.m.Unlock()
+
 				case <-nodeFeedersStopCh:
 					// NOOP.
 
@@ -442,17 +449,17 @@ func (o *Orchestrator) runPartitionMoveFeeder() {
 			}(node, nextMovesArr[0])
 		}
 
-		stopped := false
+		nodeFeedersStopChClosed := false
 
 		for range availableMoves {
 			wasFed := <-nodeFeedersDoneCh
-			if wasFed && !stopped {
+			if wasFed && !nodeFeedersStopChClosed {
 				close(nodeFeedersStopCh)
-				stopped = true
+				nodeFeedersStopChClosed = true
 			}
 		}
 
-		if !stopped {
+		if !nodeFeedersStopChClosed {
 			close(nodeFeedersStopCh)
 		}
 
