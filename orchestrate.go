@@ -372,8 +372,12 @@ func (o *Orchestrator) calcNextPartitionToAssignToNode(node string) (
 	fromNode string,
 	fromNodeTakeOver bool,
 	err error) {
-	// TODO.
-	return "", "", 0, "", false, nil
+	partitionMove, ok := <-o.mapNodeToPartitionMoveCh[node]
+	if !ok {
+		return "", "", -1, "", false, nil
+	}
+
+	return partitionMove.partition, partitionMove.state, -1, "", false, nil
 }
 
 func (o *Orchestrator) waitForPartitionNodeState(
