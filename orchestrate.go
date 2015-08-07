@@ -97,15 +97,15 @@ type PartitionStateFunc func(
 // ------------------------------------------
 
 type partitionMove struct {
-	idx       int // Position of this move in nextMoves.
 	partition string
 	state     string
 	op        string // See NodeStateOp.Op field.
 }
 
 type nextMoves struct {
-	next  int // An index into the moves array that is our next move.
-	moves []NodeStateOp
+	partition string
+	next      int // Index into moves array that is our next move.
+	moves     []NodeStateOp
 }
 
 // ------------------------------------------
@@ -149,8 +149,9 @@ func OrchestrateMoves(
 			endPartition.NodesByState)
 
 		mapPartitionToNextMoves[partitionName] = &nextMoves{
-			next:  0,
-			moves: moves,
+			partition: partitionName,
+			next:      0,
+			moves:     moves,
 		}
 	}
 
@@ -406,12 +407,56 @@ func (o *Orchestrator) runPartitionMoveFeeder() {
 			break
 		}
 
-		for _, nextMovesArr := range availableMoves {
+		nodeFeedersStopCh := make(chan struct{})
+		nodeFeedersDoneCh := make(chan bool)
+
+		for node, nextMovesArr := range availableMoves {
+			// TODO: Can optimize by finding least instead of full sort.
 			sort.Sort(&nextMovesSorter{nextMovesArr})
+
+			go func(node string, nextMoves *nextMoves) {
+				o.m.Lock()
+				nodeStateOp := nextMoves.moves[nextMoves.next]
+				o.m.Unlock()
+
+				partitionMove := partitionMove{
+					partition: nextMoves.partition,
+					state:     nodeStateOp.State,
+					op:        nodeStateOp.Op,
+				}
+
+				select {
+				case <-nodeFeedersStopCh:
+					// NOOP.
+
+				case o.mapNodeToPartitionMoveCh[node] <- partitionMove:
+					o.m.Lock()
+					nextMoves.next++
+					o.m.Unlock()
+
+					nodeFeedersDoneCh <- true
+					return
+				}
+
+				nodeFeedersDoneCh <- false
+			}(node, nextMovesArr[0])
 		}
 
-		// TODO: Now that available moves are sorted, need to feed the
-		// moves to each node's partitionMoveCh.
+		stopped := false
+
+		for i := 0; i < len(availableMoves); i++ {
+			wasFed := <-nodeFeedersDoneCh
+			if wasFed && !stopped {
+				close(nodeFeedersStopCh)
+				stopped = true
+			}
+		}
+
+		if !stopped {
+			close(nodeFeedersStopCh)
+		}
+
+		close(nodeFeedersDoneCh)
 	}
 
 	for _, partitionMoveCh := range o.mapNodeToPartitionMoveCh {
