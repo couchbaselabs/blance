@@ -171,13 +171,13 @@ func OrchestrateMoves(
 	// Start concurrent movers.
 	for _, node := range o.nodesAll {
 		for i := 0; i < n; i++ {
-			go func() {
+			go func(node string) {
 				o.m.Lock()
 				o.progress.TotRunMover++
 				o.m.Unlock()
 
 				runMoverDoneCh <- o.runMover(node, stopCh)
-			}()
+			}(node)
 		}
 	}
 
