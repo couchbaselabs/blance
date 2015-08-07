@@ -81,15 +81,11 @@ type UnassignPartitionFunc func(
 	partition string,
 	node string) error
 
-// UnassignPartitionFunc is a callback invoked by OrchestrateMoves()
+// PartitionStateFunc is a callback invoked by OrchestrateMoves()
 // when it wants to synchronously retrieve information about a
 // partition on a node.
-type PartitionStateFunc func(
-	partition string,
-	node string) (
-	state string,
-	pct float32,
-	err error)
+type PartitionStateFunc func(partition string, node string) (
+	state string, pct float32, err error)
 
 // ------------------------------------------
 
