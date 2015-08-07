@@ -259,6 +259,42 @@ func TestOrchestrateMoves(t *testing.T) {
 			},
 			expectErr: nil,
 		},
+		{
+			label:          "1 partition from a|b to c|a",
+			partitionModel: mrPartitionModel,
+			options:        options1,
+			nodesAll:       []string{"a", "b", "c"},
+			begMap: PartitionMap{
+				"00": &Partition{
+					Name: "00",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+						"replica": []string{"b"},
+					},
+				},
+			},
+			endMap: PartitionMap{
+				"00": &Partition{
+					Name: "00",
+					NodesByState: map[string][]string{
+						"master": []string{"c"},
+						"replica": []string{"a"},
+					},
+				},
+			},
+			expectAssignPartitions: []assignPartitionRec{
+				assignPartitionRec{
+					partition: "00", node: "c", state: "master",
+				},
+				assignPartitionRec{
+					partition: "00", node: "a", state: "replica",
+				},
+				assignPartitionRec{
+					partition: "00", node: "b", state: "",
+				},
+			},
+			expectErr: nil,
+		},
 	}
 
 	for testi, test := range tests {
