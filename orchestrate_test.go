@@ -1,6 +1,7 @@
 package blance
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 )
@@ -27,6 +28,7 @@ func TestOrchestrateMoves(t *testing.T) {
 	}
 
 	tests := []struct {
+		skip           bool
 		label          string
 		partitionModel PartitionModel
 		options        OrchestratorOptions
@@ -123,7 +125,7 @@ func TestOrchestrateMoves(t *testing.T) {
 				"00": &Partition{
 					Name: "00",
 					NodesByState: map[string][]string{
-						"master": []string{"a"},
+						"master":  []string{"a"},
 						"replica": []string{"b"},
 					},
 				},
@@ -153,7 +155,7 @@ func TestOrchestrateMoves(t *testing.T) {
 				"00": &Partition{
 					Name: "00",
 					NodesByState: map[string][]string{
-						"master": []string{"a"},
+						"master":  []string{"a"},
 						"replica": []string{"b"},
 					},
 				},
@@ -168,9 +170,39 @@ func TestOrchestrateMoves(t *testing.T) {
 			},
 			expectErr: nil,
 		},
+		{
+			label:          "del node a, 1 partition",
+			partitionModel: mrPartitionModel,
+			options:        options_1_1,
+			nodesAll:       []string{"a"},
+			begMap: PartitionMap{
+				"00": &Partition{
+					Name: "00",
+					NodesByState: map[string][]string{
+						"master": []string{"a"},
+					},
+				},
+			},
+			endMap: PartitionMap{
+				"00": &Partition{
+					Name:         "00",
+					NodesByState: map[string][]string{},
+				},
+			},
+			expectAssignPartitions: []assignPartitionRec{
+				assignPartitionRec{
+					partition: "00", node: "a", state: "",
+				},
+			},
+			expectErr: nil,
+		},
 	}
 
 	for testi, test := range tests {
+		if test.skip {
+			continue
+		}
+
 		var m sync.Mutex
 
 		var assignPartitionRecs []assignPartitionRec
@@ -209,9 +241,23 @@ func TestOrchestrateMoves(t *testing.T) {
 				test.expectErr, err)
 		}
 
-		for range o.ProgressCh() {
-			// TODO: Should check for expected progress.
+		debug := false
+
+		if debug {
+			o.m.Lock()
+			fmt.Printf("test: %q\n  START progress: %#v\n",
+				test.label, o.progress)
+			o.m.Unlock()
 		}
+
+		for progress := range o.ProgressCh() {
+			if debug {
+				fmt.Printf("test: %q\n  progress: %#v\n",
+					test.label, progress)
+			}
+		}
+
+		o.Stop()
 
 		if len(assignPartitionRecs) != len(test.expectAssignPartitions) {
 			t.Errorf("testi: %d, label: %s,"+
