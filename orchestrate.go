@@ -34,9 +34,6 @@ type Orchestrator struct {
 
 	progressCh chan OrchestratorProgress
 
-	tokensSupplyCh  chan int
-	tokensReleaseCh chan int
-
 	mapNodeToPartitionMoveCh map[string]chan partitionMove
 
 	m sync.Mutex // Protects the fields that follow.
@@ -154,8 +151,6 @@ func OrchestrateMoves(
 		assignPartition: assignPartition,
 		partitionState:  partitionState,
 		progressCh:      make(chan OrchestratorProgress),
-		tokensSupplyCh:  make(chan int, len(nodesAll)*m),
-		tokensReleaseCh: make(chan int, len(nodesAll)*m),
 
 		mapNodeToPartitionMoveCh: mapNodeToPartitionMoveCh,
 
@@ -185,9 +180,6 @@ func OrchestrateMoves(
 		}
 	}
 
-	// Supply tokens to movers.
-	go o.runSupplyTokens(len(nodesAll)*m)
-
 	// Supply moves to movers.
 	go o.runSupplyMoves(stopCh)
 
@@ -206,8 +198,6 @@ func OrchestrateMoves(
 
 			o.progressCh <- progress
 		}
-
-		close(o.tokensReleaseCh)
 
 		close(o.progressCh)
 	}()
@@ -263,6 +253,8 @@ func (o *Orchestrator) ResumeNewAssignments() error {
 }
 
 func (o *Orchestrator) runMover(node string, stopCh chan struct{}) error {
+	partitionMoveCh := o.mapNodeToPartitionMoveCh[node]
+
 	for {
 		select {
 		case _, ok := <-stopCh:
@@ -270,82 +262,31 @@ func (o *Orchestrator) runMover(node string, stopCh chan struct{}) error {
 				return nil
 			}
 
-		case token, ok := <-o.tokensSupplyCh:
+		case partitionMove, ok := <-partitionMoveCh:
 			if !ok {
 				return nil
 			}
 
-			partition, state, err := o.nextMove(node)
-			if err != nil || partition == "" {
-				o.tokensReleaseCh <- token
-				return err
+			partition := partitionMove.partition
+			if partition == "" {
+				return nil
 			}
 
-			err = o.assignPartition(partition, node, state)
+			state := partitionMove.state
+
+			err := o.assignPartition(partition, node, state)
 			if err != nil {
-				o.tokensReleaseCh <- token
 				return err
 			}
 
 			err = o.waitForPartitionNodeState(stopCh, partition, node, state)
 			if err != nil {
-				o.tokensReleaseCh <- token
 				return err
 			}
-
-			o.tokensReleaseCh <- token
 		}
 	}
 
 	return nil
-}
-
-func (o *Orchestrator) nextMove(node string) (
-	partition string, state string, err error) {
-	partitionMove, ok := <-o.mapNodeToPartitionMoveCh[node]
-	if !ok {
-		return "", "", nil
-	}
-
-	return partitionMove.partition, partitionMove.state, nil
-}
-
-func (o *Orchestrator) runSupplyTokens(numStartTokens int) {
-	defer close(o.tokensSupplyCh)
-
-	for i := 0; i < numStartTokens; i++ {
-		// Tokens available to throttle concurrency.
-		o.tokensSupplyCh <- i
-	}
-
-	for {
-		select {
-		case token, ok := <-o.tokensReleaseCh:
-			if !ok {
-				return
-			}
-
-			// Check if we're paused w.r.t. starting new reassignments.
-			o.m.Lock()
-			stopCh := o.stopCh
-			pauseCh := o.pauseCh
-			o.m.Unlock()
-
-			if stopCh != nil {
-				if pauseCh != nil {
-					select {
-					case <-stopCh:
-						// PASS.
-					case <-pauseCh:
-						// We're now resumed.
-						o.tokensSupplyCh <- token
-					}
-				} else {
-					o.tokensSupplyCh <- token
-				}
-			}
-		}
-	}
 }
 
 func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
@@ -365,10 +306,16 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 			}
 		}
 
+		pauseCh := o.pauseCh
+
 		o.m.Unlock()
 
 		if len(availableMoves) <= 0 {
 			break
+		}
+
+		if pauseCh != nil {
+			<-pauseCh
 		}
 
 		nodeFeedersStopCh := make(chan struct{})

@@ -202,7 +202,7 @@ func TestOrchestrateMoves(t *testing.T) {
 			nodesAll:       []string{"a", "b"},
 			begMap: PartitionMap{
 				"00": &Partition{
-					Name:         "00",
+					Name: "00",
 					NodesByState: map[string][]string{
 						"master": []string{"a"},
 					},
