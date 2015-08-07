@@ -96,9 +96,13 @@ type partitionMove struct {
 }
 
 type nextMoves struct {
-	partition string
-	next      int // Index into moves array that is our next move.
-	moves     []NodeStateOp
+	partition string // Immutable.
+
+	// Mutable index or current position in the moves array that
+	// represents the next available move for a partition.
+	next int
+
+	moves []NodeStateOp // Immutable.
 }
 
 // ------------------------------------------
