@@ -12,6 +12,7 @@
 package blance
 
 import (
+	"sort"
 	"sync"
 )
 
@@ -386,22 +387,62 @@ func (o *Orchestrator) nextPartitionMove(node string) (
 
 func (o *Orchestrator) runPartitionMoveFeeder() {
 	for {
-		found := false
-		for partitionName, nextMoves := range o.mapPartitionToNextMoves {
-			if partitionName == "" || nextMoves == nil {
+		// The availableMoves is keyed by node name.
+		availableMoves := map[string][]*nextMoves{}
+
+		o.m.Lock()
+
+		for _, nextMoves := range o.mapPartitionToNextMoves {
+			if nextMoves.next < len(nextMoves.moves) {
+				node := nextMoves.moves[nextMoves.next].Node
+				availableMoves[node] =
+					append(availableMoves[node], nextMoves)
 			}
 		}
 
-		// TODO. And possibly the wrong structural flows.
+		o.m.Unlock()
 
-		if found == false {
+		if len(availableMoves) <= 0 {
 			break
 		}
+
+		for _, nextMovesArr := range availableMoves {
+			sort.Sort(&nextMovesSorter{nextMovesArr})
+		}
+
+		// TODO: Now that available moves are sorted, need to feed the
+		// moves to each node's partitionMoveCh.
 	}
 
 	for _, partitionMoveCh := range o.mapNodeToPartitionMoveCh {
 		close(partitionMoveCh)
 	}
+}
+
+var opWeight = map[string]int{
+	"promote": 0,
+	"demote":  1,
+	"add":     2,
+	"del":     3,
+}
+
+type nextMovesSorter struct {
+	s []*nextMoves
+}
+
+func (a *nextMovesSorter) Len() int {
+	return len(a.s)
+}
+
+func (a *nextMovesSorter) Less(i, j int) bool {
+	opi := a.s[i].moves[a.s[i].next].Op
+	opj := a.s[j].moves[a.s[j].next].Op
+
+	return opWeight[opi] < opWeight[opj]
+}
+
+func (a *nextMovesSorter) Swap(i, j int) {
+	a.s[i], a.s[j] = a.s[j], a.s[i]
 }
 
 func (o *Orchestrator) waitForPartitionNodeState(
