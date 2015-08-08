@@ -12,8 +12,11 @@
 package blance
 
 import (
+	"errors"
 	"sync"
 )
+
+var ErrorStopped = errors.New("stopped")
 
 // An Orchestrator instance holds the runtime state during an
 // OrchestrateMoves() operation.
@@ -413,6 +416,21 @@ func (o *Orchestrator) waitForPartitionNodeState(
 	partition string,
 	node string,
 	state string) error {
-	// TODO.
-	return nil
+	for {
+		select {
+		case <-stopCh:
+			return ErrorStopped
+		default:
+		}
+
+		currState, currPct, err :=
+			o.partitionState(stopCh, partition, node)
+		if err != nil {
+			return err
+		}
+
+		if currState == state && currPct >= 0.99 {
+			return nil
+		}
+	}
 }

@@ -440,13 +440,26 @@ func TestOrchestrateMoves(t *testing.T) {
 
 		var m sync.Mutex
 
+		// Map of partition -> node -> state.
+		currStates := map[string]map[string]string{}
+
 		assignPartitionRecs := map[string][]assignPartitionRec{}
 
 		assignPartitionFunc := func(partition, node, state, op string) error {
 			m.Lock()
+
 			assignPartitionRecs[partition] =
 				append(assignPartitionRecs[partition],
 					assignPartitionRec{partition, node, state, op})
+
+			nodes := currStates[partition]
+			if nodes == nil {
+				nodes = map[string]string{}
+				currStates[partition] = nodes
+			}
+
+			nodes[node] = state
+
 			m.Unlock()
 
 			return nil
@@ -455,7 +468,11 @@ func TestOrchestrateMoves(t *testing.T) {
 		partitionStateFunc := func(stopCh chan struct{},
 			partition string, node string) (
 			state string, pct float32, err error) {
-			return "", 0, nil
+			m.Lock()
+			currState := currStates[partition][node]
+			m.Unlock()
+
+			return currState, 1.0, nil
 		}
 
 		o, err := OrchestrateMoves(test.label,
