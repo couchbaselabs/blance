@@ -74,7 +74,8 @@ type AssignPartitionFunc func(
 // PartitionStateFunc is a callback invoked by OrchestrateMoves()
 // when it wants to synchronously retrieve information about a
 // partition on a node.
-type PartitionStateFunc func(partition string, node string) (
+type PartitionStateFunc func(stopCh chan struct{},
+	partition string, node string) (
 	state string, pct float32, err error)
 
 // ------------------------------------------
@@ -106,6 +107,11 @@ type nextMoves struct {
 // invoking the assignPartition() to affect changes.  Additionally,
 // the caller must read the progress channel until it's closed by
 // OrchestrateMoves to avoid blocking the orchestration.
+//
+// The label is used for debug/diagnostic messages.
+//
+// The nodesAll must be a union or superset of all the nodes during
+// the orchestration (nodes added, removed, unchanged).
 func OrchestrateMoves(
 	label string,
 	model PartitionModel,

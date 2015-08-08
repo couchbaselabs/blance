@@ -452,7 +452,8 @@ func TestOrchestrateMoves(t *testing.T) {
 			return nil
 		}
 
-		partitionStateFunc := func(partition string, node string) (
+		partitionStateFunc := func(stopCh chan struct{},
+			partition string, node string) (
 			state string, pct float32, err error) {
 			return "", 0, nil
 		}
