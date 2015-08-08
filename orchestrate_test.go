@@ -36,7 +36,8 @@ func TestOrchestrateMoves(t *testing.T) {
 		endMap         PartitionMap
 		expectErr      error
 
-		expectAssignPartitions []assignPartitionRec
+		// Keyed by partition.
+		expectAssignPartitions map[string][]assignPartitionRec
 	}{
 		{
 			label:          "do nothing",
@@ -102,9 +103,11 @@ func TestOrchestrateMoves(t *testing.T) {
 					},
 				},
 			},
-			expectAssignPartitions: []assignPartitionRec{
-				assignPartitionRec{
-					partition: "00", node: "a", state: "master",
+			expectAssignPartitions: map[string][]assignPartitionRec{
+				"00": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "00", node: "a", state: "master",
+					},
 				},
 			},
 			expectErr: nil,
@@ -129,12 +132,14 @@ func TestOrchestrateMoves(t *testing.T) {
 					},
 				},
 			},
-			expectAssignPartitions: []assignPartitionRec{
-				assignPartitionRec{
-					partition: "00", node: "a", state: "master",
-				},
-				assignPartitionRec{
-					partition: "00", node: "b", state: "replica",
+			expectAssignPartitions: map[string][]assignPartitionRec{
+				"00": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "00", node: "a", state: "master",
+					},
+					assignPartitionRec{
+						partition: "00", node: "b", state: "replica",
+					},
 				},
 			},
 			expectErr: nil,
@@ -159,12 +164,14 @@ func TestOrchestrateMoves(t *testing.T) {
 					},
 				},
 			},
-			expectAssignPartitions: []assignPartitionRec{
-				assignPartitionRec{
-					partition: "00", node: "a", state: "master",
-				},
-				assignPartitionRec{
-					partition: "00", node: "b", state: "replica",
+			expectAssignPartitions: map[string][]assignPartitionRec{
+				"00": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "00", node: "a", state: "master",
+					},
+					assignPartitionRec{
+						partition: "00", node: "b", state: "replica",
+					},
 				},
 			},
 			expectErr: nil,
@@ -188,9 +195,11 @@ func TestOrchestrateMoves(t *testing.T) {
 					NodesByState: map[string][]string{},
 				},
 			},
-			expectAssignPartitions: []assignPartitionRec{
-				assignPartitionRec{
-					partition: "00", node: "a", state: "",
+			expectAssignPartitions: map[string][]assignPartitionRec{
+				"00": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "00", node: "a", state: "",
+					},
 				},
 			},
 			expectErr: nil,
@@ -216,12 +225,14 @@ func TestOrchestrateMoves(t *testing.T) {
 					},
 				},
 			},
-			expectAssignPartitions: []assignPartitionRec{
-				assignPartitionRec{
-					partition: "00", node: "b", state: "master",
-				},
-				assignPartitionRec{
-					partition: "00", node: "a", state: "",
+			expectAssignPartitions: map[string][]assignPartitionRec{
+				"00": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "00", node: "b", state: "master",
+					},
+					assignPartitionRec{
+						partition: "00", node: "a", state: "",
+					},
 				},
 			},
 			expectErr: nil,
@@ -235,7 +246,7 @@ func TestOrchestrateMoves(t *testing.T) {
 				"00": &Partition{
 					Name: "00",
 					NodesByState: map[string][]string{
-						"master": []string{"a"},
+						"master":  []string{"a"},
 						"replica": []string{"c"},
 					},
 				},
@@ -244,17 +255,19 @@ func TestOrchestrateMoves(t *testing.T) {
 				"00": &Partition{
 					Name: "00",
 					NodesByState: map[string][]string{
-						"master": []string{"b"},
+						"master":  []string{"b"},
 						"replica": []string{"c"},
 					},
 				},
 			},
-			expectAssignPartitions: []assignPartitionRec{
-				assignPartitionRec{
-					partition: "00", node: "b", state: "master",
-				},
-				assignPartitionRec{
-					partition: "00", node: "a", state: "",
+			expectAssignPartitions: map[string][]assignPartitionRec{
+				"00": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "00", node: "b", state: "master",
+					},
+					assignPartitionRec{
+						partition: "00", node: "a", state: "",
+					},
 				},
 			},
 			expectErr: nil,
@@ -268,7 +281,7 @@ func TestOrchestrateMoves(t *testing.T) {
 				"00": &Partition{
 					Name: "00",
 					NodesByState: map[string][]string{
-						"master": []string{"a"},
+						"master":  []string{"a"},
 						"replica": []string{"b"},
 					},
 				},
@@ -277,20 +290,22 @@ func TestOrchestrateMoves(t *testing.T) {
 				"00": &Partition{
 					Name: "00",
 					NodesByState: map[string][]string{
-						"master": []string{"c"},
+						"master":  []string{"c"},
 						"replica": []string{"a"},
 					},
 				},
 			},
-			expectAssignPartitions: []assignPartitionRec{
-				assignPartitionRec{
-					partition: "00", node: "c", state: "master",
-				},
-				assignPartitionRec{
-					partition: "00", node: "a", state: "replica",
-				},
-				assignPartitionRec{
-					partition: "00", node: "b", state: "",
+			expectAssignPartitions: map[string][]assignPartitionRec{
+				"00": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "00", node: "c", state: "master",
+					},
+					assignPartitionRec{
+						partition: "00", node: "a", state: "replica",
+					},
+					assignPartitionRec{
+						partition: "00", node: "b", state: "",
+					},
 				},
 			},
 			expectErr: nil,
@@ -304,12 +319,13 @@ func TestOrchestrateMoves(t *testing.T) {
 
 		var m sync.Mutex
 
-		var assignPartitionRecs []assignPartitionRec
+		assignPartitionRecs := map[string][]assignPartitionRec{}
 
 		assignPartitionFunc := func(partition, node, state string) error {
 			m.Lock()
-			assignPartitionRecs = append(assignPartitionRecs,
-				assignPartitionRec{partition, node, state})
+			assignPartitionRecs[partition] =
+				append(assignPartitionRecs[partition],
+					assignPartitionRec{partition, node, state})
 			m.Unlock()
 
 			return nil
@@ -371,16 +387,18 @@ func TestOrchestrateMoves(t *testing.T) {
 				test.expectAssignPartitions)
 		}
 
-		for eapi, eap := range test.expectAssignPartitions {
-			apr := assignPartitionRecs[eapi]
-			if eap.partition != apr.partition ||
-				eap.node != apr.node ||
-				eap.state != apr.state {
-				t.Errorf("testi: %d, label: %s,"+
-					" mismatched assignment,"+
-					" eapi: %d, eap: %#v, apr: %#v",
-					testi, test.label,
-					eapi, eap, apr)
+		for partition, eapm := range test.expectAssignPartitions {
+			for eapi, eap := range eapm {
+				apr := assignPartitionRecs[partition][eapi]
+				if eap.partition != apr.partition ||
+					eap.node != apr.node ||
+					eap.state != apr.state {
+					t.Errorf("testi: %d, label: %s,"+
+						" mismatched assignment,"+
+						" eapi: %d, eap: %#v, apr: %#v",
+						testi, test.label,
+						eapi, eap, apr)
+				}
 			}
 		}
 	}
