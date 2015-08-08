@@ -10,6 +10,7 @@ type assignPartitionRec struct {
 	partition string
 	node      string
 	state     string
+	op        string
 }
 
 func TestOrchestrateMoves(t *testing.T) {
@@ -441,11 +442,11 @@ func TestOrchestrateMoves(t *testing.T) {
 
 		assignPartitionRecs := map[string][]assignPartitionRec{}
 
-		assignPartitionFunc := func(partition, node, state string) error {
+		assignPartitionFunc := func(partition, node, state, op string) error {
 			m.Lock()
 			assignPartitionRecs[partition] =
 				append(assignPartitionRecs[partition],
-					assignPartitionRec{partition, node, state})
+					assignPartitionRec{partition, node, state, op})
 			m.Unlock()
 
 			return nil

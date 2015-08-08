@@ -68,7 +68,8 @@ type OrchestratorProgress struct {
 type AssignPartitionFunc func(
 	partition string,
 	node string,
-	state string) error
+	state string,
+	op string) error
 
 // PartitionStateFunc is a callback invoked by OrchestrateMoves()
 // when it wants to synchronously retrieve information about a
@@ -80,8 +81,12 @@ type PartitionStateFunc func(partition string, node string) (
 
 type partitionMove struct {
 	partition string
-	state     string
-	op        string // See NodeStateOp.Op field.
+
+	// Ex: "master", "replica".
+	state string
+
+	// Same as NodeStateOp.Op: "add", "del", "promote", "demote".
+	op string
 }
 
 type nextMoves struct {
@@ -274,7 +279,7 @@ func (o *Orchestrator) runMover(node string, stopCh chan struct{}) error {
 
 			state := partitionMove.state
 
-			err := o.assignPartition(partition, node, state)
+			err := o.assignPartition(partition, node, state, partitionMove.op)
 			if err != nil {
 				return err
 			}
