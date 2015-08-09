@@ -18,6 +18,26 @@ import (
 
 var ErrorStopped = errors.New("stopped")
 
+// LowestWeightMoveForNode implements the FindMoveFunc callback
+// signature, using the MoveOpWeight lookup table to find the lowest
+// weight move for a node.
+func LowestWeightMoveForNode(node string, moves[]NodeStateOp) int {
+	r := 0
+	for i, move := range moves {
+		if MoveOpWeight[moves[r].Op] > MoveOpWeight[move.Op] {
+			r = i
+		}
+	}
+	return r
+}
+
+var MoveOpWeight = map[string]int{
+	"promote": 10,
+	"demote":  20,
+	"add":     30,
+	"del":     40,
+}
+
 /*
 TODO: Some move prioritization heuristics to consider:
 
@@ -82,6 +102,7 @@ type Orchestrator struct {
 
 	assignPartition AssignPartitionFunc
 	partitionState  PartitionStateFunc
+	findMove        FindMoveFunc
 
 	progressCh chan OrchestratorProgress
 
@@ -129,6 +150,12 @@ type PartitionStateFunc func(stopCh chan struct{},
 	partition string, node string) (
 	state string, pct float32, err error)
 
+// FindMoveFunc is a callback invoked by OrchestrateMoves() when it
+// wants to find the bext move out of a set of available moves for
+// node.  It should return the array index of the move that should be
+// used next.
+type FindMoveFunc func (node string, moves[]NodeStateOp) int
+
 // ------------------------------------------
 
 // A partitionMove struct represents a requested state assignment of a
@@ -168,6 +195,10 @@ type nextMoves struct {
 //
 // The nodesAll must be a union or superset of all the nodes during
 // the orchestration (nodes added, removed, unchanged).
+//
+// The findMove callback is invoked when OrchestrateMoves needs to
+// find the best move for a node from amongst a set of available
+// moves.
 func OrchestrateMoves(
 	model PartitionModel,
 	options OrchestratorOptions,
@@ -176,6 +207,7 @@ func OrchestrateMoves(
 	endMap PartitionMap,
 	assignPartition AssignPartitionFunc,
 	partitionState PartitionStateFunc,
+	findMove FindMoveFunc,
 ) (*Orchestrator, error) {
 	// Populate the mapNodeToPartitionMoveCh, keyed by node name.
 	mapNodeToPartitionMoveCh := map[string]chan partitionMove{}
@@ -215,6 +247,7 @@ func OrchestrateMoves(
 		endMap:          endMap,
 		assignPartition: assignPartition,
 		partitionState:  partitionState,
+		findMove:        findMove,
 		progressCh:      make(chan OrchestratorProgress),
 
 		mapNodeToPartitionMoveCh: mapNodeToPartitionMoveCh,
@@ -447,7 +480,7 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 				}
 
 				nodeFeedersDoneCh <- false
-			}(node, findBestNextMoves(nextMovesArr))
+			}(node, o.findBestNextMoves(node, nextMovesArr))
 		}
 
 		nodeFeedersStopChClosed := false
@@ -472,24 +505,14 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 	}
 }
 
-var opWeight = map[string]int{
-	"promote": 0,
-	"demote":  1,
-	"add":     2,
-	"del":     3,
-}
-
-func findBestNextMoves(nextMovesArr []*nextMoves) *nextMoves {
-	// Simple implementation right now just favors promotions, then
-	// demotions, then adds, then dels (removals).
-	r := nextMovesArr[0]
-	for _, x := range nextMovesArr {
-		if opWeight[r.moves[r.next].Op] >
-			opWeight[x.moves[x.next].Op] {
-			r = x
-		}
+func (o *Orchestrator) findBestNextMoves(
+	node string, nextMovesArr []*nextMoves) *nextMoves {
+	moves := make([]NodeStateOp, len(nextMovesArr))
+	for i, nextMoves := range nextMovesArr {
+		moves[i] = nextMoves.moves[nextMoves.next]
 	}
-	return r
+
+	return nextMovesArr[o.findMove(node, moves)]
 }
 
 func (o *Orchestrator) waitForPartitionNodeState(
