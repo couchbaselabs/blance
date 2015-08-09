@@ -116,7 +116,7 @@ type OrchestratorProgress struct {
 // given state, or change the state of an existing partition on a
 // node.  The state will be "" if the partition should be removed or
 // deleted from the ndoe.
-type AssignPartitionFunc func(
+type AssignPartitionFunc func(stopCh chan struct{},
 	partition string,
 	node string,
 	state string,
@@ -367,12 +367,14 @@ func (o *Orchestrator) runMover(stopCh chan struct{},
 
 			state := partitionMove.state
 
-			err := o.assignPartition(partition, node, state, partitionMove.op)
+			err := o.assignPartition(stopCh,
+				partition, node, state, partitionMove.op)
 			if err != nil {
 				return err
 			}
 
-			err = o.waitForPartitionNodeState(stopCh, partition, node, state)
+			err = o.waitForPartitionNodeState(stopCh,
+				partition, node, state)
 			if err != nil {
 				return err
 			}

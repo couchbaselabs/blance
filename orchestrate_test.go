@@ -445,7 +445,8 @@ func TestOrchestrateMoves(t *testing.T) {
 
 		assignPartitionRecs := map[string][]assignPartitionRec{}
 
-		assignPartitionFunc := func(partition, node, state, op string) error {
+		assignPartitionFunc := func(stopCh chan struct{},
+			partition, node, state, op string) error {
 			m.Lock()
 
 			assignPartitionRecs[partition] =
