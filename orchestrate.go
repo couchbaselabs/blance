@@ -19,34 +19,14 @@ import (
 
 var ErrorStopped = errors.New("stopped")
 
-// LowestWeightPartitionMoveForNode implements the FindMoveFunc
-// callback signature, using the MoveOpWeight lookup table to find the
-// lowest weight partition move for a node.
-func LowestWeightPartitionMoveForNode(
-	node string, moves []PartitionMove) int {
-	r := 0
-	for i, move := range moves {
-		if MoveOpWeight[moves[r].Op] > MoveOpWeight[move.Op] {
-			r = i
-		}
-	}
-	return r
-}
-
-var MoveOpWeight = map[string]int{
-	"promote": 10,
-	"demote":  20,
-	"add":     30,
-	"del":     40,
-}
-
 /*
 TODO: Some move prioritization heuristics to consider:
 
 First, favor easy, single-node promotions and demotions (e.g., a
 replica partition graduating to master on the same node) because
 single-node state changes should be fast and so that clients can have
-more coverage across all partitions.
+more coverage across all partitions.  The
+LowestWeightPartitionMoveForNode() implementation does this now.
 
 Next, favor assignments of partitions that have no replicas assigned
 anywhere, where we want to get to that first PIndex instance or
@@ -90,6 +70,8 @@ full-scan (backfill).
 Perhaps consider how about some randomness?
 */
 
+// ------------------------------------------
+
 // An Orchestrator instance holds the runtime state during an
 // OrchestrateMoves() operation.
 type Orchestrator struct {
@@ -119,10 +101,14 @@ type Orchestrator struct {
 	mapPartitionToNextMoves map[string]*nextMoves
 }
 
+// OrchestratorOptions represents advanced config parameters for
+// OrchestrateMoves().
 type OrchestratorOptions struct {
 	MaxConcurrentPartitionMovesPerNode int
 }
 
+// OrchestratorProgress represents progress counters and/or error
+// information as the OrchestrateMoves() operation proceeds.
 type OrchestratorProgress struct {
 	Errors                      []error
 	TotPartitionsAssigned       int
@@ -158,10 +144,8 @@ type PartitionStateFunc func(stopCh chan struct{},
 // partition move that should be used next.
 type FindMoveFunc func(node string, moves []PartitionMove) int
 
-// ------------------------------------------
-
-// A PartitionMove struct represents a state change of a partition on
-// a node.
+// A PartitionMove struct represents a state change or operation on a
+// partition on a node.
 type PartitionMove struct {
 	Partition string
 
@@ -173,6 +157,29 @@ type PartitionMove struct {
 	// Same as NodeStateOp.Op: "add", "del", "promote", "demote".
 	Op string
 }
+
+// LowestWeightPartitionMoveForNode implements the FindMoveFunc
+// callback signature, by using the MoveOpWeight lookup table to find
+// the lowest weight partition move for a node.
+func LowestWeightPartitionMoveForNode(
+	node string, moves []PartitionMove) int {
+	r := 0
+	for i, move := range moves {
+		if MoveOpWeight[moves[r].Op] > MoveOpWeight[move.Op] {
+			r = i
+		}
+	}
+	return r
+}
+
+var MoveOpWeight = map[string]int{
+	"promote": 1,
+	"demote":  2,
+	"add":     3,
+	"del":     4,
+}
+
+// ------------------------------------------
 
 // A nextMoves struct is used to track a sequence of moves of a
 // partition, including the next move that that needs to be taken.
