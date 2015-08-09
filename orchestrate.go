@@ -190,8 +190,7 @@ func OrchestrateMoves(
 	//
 	// As an analogy, this step calculates a bunch of airplane flight
 	// plans, without consideration to what the other airplanes are
-	// doing, where each flight plan has multi-city, multi-leg
-	// destination hops.
+	// doing, where each flight plan has multi-city, multi-leg hops.
 	mapPartitionToNextMoves := map[string]*nextMoves{}
 
 	for partitionName, begPartition := range begMap {
@@ -232,10 +231,10 @@ func OrchestrateMoves(
 
 	// Start concurrent movers.
 	//
-	// Following the airplane/airport analogy, a runMover() represents
-	// a takeoff runway at some city's airport (or node).  There might
-	// be multiple takeoff runways, of course, at some city aiports
-	// (controlled by MaxConcurrentPartitionMovesPerNode).
+	// Following the airplane analogy, a runMover() represents
+	// a takeoff runway at a city airport (or node).  There can
+	// be multiple takeoff runways at a city's airport (which is
+	// controlled by MaxConcurrentPartitionMovesPerNode).
 	m := options.MaxConcurrentPartitionMovesPerNode
 	if m < 1 {
 		m = 1
@@ -251,11 +250,11 @@ func OrchestrateMoves(
 
 				o.progressCh <- progress
 
-				// The partitionMoveCh has commands from a global,
+				// The partitionMoveCh has commands from the global,
 				// supreme airport controller on which airplane (or
 				// partition) should takeoff from the city airport
-				// next (but doesn't care which takeoff runway is
-				// used).
+				// next (but the supreme airport controller doesn't
+				// care which takeoff runway is used).
 				partitionMoveCh := o.mapNodeToPartitionMoveCh[node]
 
 				runMoverDoneCh <- o.runMover(stopCh, partitionMoveCh, node)
@@ -267,13 +266,14 @@ func OrchestrateMoves(
 	//
 	// Following the airplane/airport analogy, a runSupplyMoves()
 	// goroutine is like some global, supreme airport controller,
-	// remotely controlling all the city airports across the realm,
-	// and deciding which plane can take off next.  Each plane is
-	// following its multi-leg destination hops that was computed from
-	// earlier above (CalcPartitionMoves), but when multiple planes
-	// are concurrently ready to takeoff from a city's airport (or
-	// node), this global, supreme airport controller chooses which
-	// plane (or partition) gets to takeoff next.
+	// remotely controlling all the city airports across the entire
+	// realm, and deciding which plane can take off next at each
+	// airport.  Each plane is following its multi-leg flight plan
+	// that was computed from earlier (via CalcPartitionMoves), but
+	// when multiple planes are concurrently ready to takeoff from a
+	// city's airport (or node), this global, supreme airport
+	// controller chooses which plane (or partition) gets to takeoff
+	// next.
 	go o.runSupplyMoves(stopCh)
 
 	// Wait for movers to finish and then cleanup.
