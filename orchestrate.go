@@ -21,10 +21,10 @@ var ErrorStopped = errors.New("stopped")
 /*
 TODO: Some move prioritization heuristics to consider:
 
-First, favor easy promotions and demotions (e.g., a replica graduating
-to master) so that clients can have more coverage across all
-partitions. This is the equivalent of a VBucket changing state from
-replica to master.
+First, favor easy, single-node promotions and demotions (e.g., a
+replica partition graduating to master on the same node) because
+single-node state changes should be fast and so that clients can have
+more coverage across all partitions.
 
 Next, favor assignments of partitions that have no replicas assigned
 anywhere, where we want to get to that first PIndex instance or
@@ -177,12 +177,7 @@ func OrchestrateMoves(
 	assignPartition AssignPartitionFunc,
 	partitionState PartitionStateFunc,
 ) (*Orchestrator, error) {
-	m := options.MaxConcurrentPartitionMovesPerNode
-	if m < 1 {
-		m = 1
-	}
-
-	// The mapNodeToPartitionMoveCh is keyed by node name.
+	// Populate the mapNodeToPartitionMoveCh, keyed by node name.
 	mapNodeToPartitionMoveCh := map[string]chan partitionMove{}
 	for _, node := range nodesAll {
 		mapNodeToPartitionMoveCh[node] = make(chan partitionMove)
@@ -190,7 +185,13 @@ func OrchestrateMoves(
 
 	states := sortStateNames(model)
 
-	// The mapPartitionToNextMoves is keyed by partition name.
+	// Populate the mapPartitionToNextMoves, keyed by partition name,
+	// with the output from CalcPartitionMoves().
+	//
+	// As an analogy, this step calculates a bunch of airplane flight
+	// plans, without consideration to what the other airplanes are
+	// doing, where each flight plan has multi-city, multi-leg
+	// destination hops.
 	mapPartitionToNextMoves := map[string]*nextMoves{}
 
 	for partitionName, begPartition := range begMap {
@@ -230,6 +231,16 @@ func OrchestrateMoves(
 	runMoverDoneCh := make(chan error)
 
 	// Start concurrent movers.
+	//
+	// Following the airplane/airport analogy, a runMover() represents
+	// a takeoff runway at some city's airport (or node).  There might
+	// be multiple takeoff runways, of course, at some city aiports
+	// (controlled by MaxConcurrentPartitionMovesPerNode).
+	m := options.MaxConcurrentPartitionMovesPerNode
+	if m < 1 {
+		m = 1
+	}
+
 	for _, node := range o.nodesAll {
 		for i := 0; i < m; i++ {
 			go func(node string) {
@@ -240,15 +251,33 @@ func OrchestrateMoves(
 
 				o.progressCh <- progress
 
-				runMoverDoneCh <- o.runMover(node, stopCh)
+				// The partitionMoveCh has commands from a global,
+				// supreme airport controller on which airplane (or
+				// partition) should takeoff from the city airport
+				// next (but doesn't care which takeoff runway is
+				// used).
+				partitionMoveCh := o.mapNodeToPartitionMoveCh[node]
+
+				runMoverDoneCh <- o.runMover(stopCh, partitionMoveCh, node)
 			}(node)
 		}
 	}
 
 	// Supply moves to movers.
+	//
+	// Following the airplane/airport analogy, a runSupplyMoves()
+	// goroutine is like some global, supreme airport controller,
+	// remotely controlling all the city airports across the realm,
+	// and deciding which plane can take off next.  Each plane is
+	// following its multi-leg destination hops that was computed from
+	// earlier above (CalcPartitionMoves), but when multiple planes
+	// are concurrently ready to takeoff from a city's airport (or
+	// node), this global, supreme airport controller chooses which
+	// plane (or partition) gets to takeoff next.
 	go o.runSupplyMoves(stopCh)
 
-	go func() { // Wait for movers to finish and then cleanup.
+	// Wait for movers to finish and then cleanup.
+	go func() {
 		for i := 0; i < len(o.nodesAll)*m; i++ {
 			err := <-runMoverDoneCh
 
@@ -317,9 +346,8 @@ func (o *Orchestrator) ResumeNewAssignments() error {
 	return nil // TODO.
 }
 
-func (o *Orchestrator) runMover(node string, stopCh chan struct{}) error {
-	partitionMoveCh := o.mapNodeToPartitionMoveCh[node]
-
+func (o *Orchestrator) runMover(stopCh chan struct{},
+	partitionMoveCh chan partitionMove, node string) error {
 	for {
 		select {
 		case _, ok := <-stopCh:
