@@ -489,6 +489,10 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 		nodeFeedersStopCh := make(chan struct{})
 		nodeFeedersDoneCh := make(chan bool)
 
+		// Broadcast to every node mover their next, best move, and
+		// when the one or more node movers is successfully "fed",
+		// then stop the broadcast (via nodeFeedersStopCh) so that we
+		// can repeat the outer loop to re-calculate available moves.
 		for node, nextMovesArr := range availableMoves {
 			go func(node string, nextMoves *nextMoves) {
 				o.m.Lock()
