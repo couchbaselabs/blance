@@ -11,8 +11,8 @@
 
 package blance
 
-// A NodeStateOp associates a node with a state and operation.  An
-// array of NodeStateOp's could be interpreted as a series of
+// A NodeStateOp associates a node with a state change and operation.
+// An array of NodeStateOp's could be interpreted as a series of
 // node-by-node state transitions for a partition.  For example, for
 // partition X, the NodeState transitions might be: first add node A
 // to "master", then demote node B to "replica", then remove (or del)

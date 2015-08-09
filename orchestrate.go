@@ -18,10 +18,11 @@ import (
 
 var ErrorStopped = errors.New("stopped")
 
-// LowestWeightMoveForNode implements the FindMoveFunc callback
-// signature, using the MoveOpWeight lookup table to find the lowest
-// weight move for a node.
-func LowestWeightMoveForNode(node string, moves[]NodeStateOp) int {
+// LowestWeightPartitionMoveForNode implements the FindMoveFunc
+// callback signature, using the MoveOpWeight lookup table to find the
+// lowest weight partition move for a node.
+func LowestWeightPartitionMoveForNode(
+	node string, moves []PartitionMove) int {
 	r := 0
 	for i, move := range moves {
 		if MoveOpWeight[moves[r].Op] > MoveOpWeight[move.Op] {
@@ -106,7 +107,7 @@ type Orchestrator struct {
 
 	progressCh chan OrchestratorProgress
 
-	mapNodeToPartitionMoveCh map[string]chan partitionMove
+	mapNodeToPartitionMoveCh map[string]chan PartitionMove
 
 	m sync.Mutex // Protects the fields that follow.
 
@@ -151,23 +152,25 @@ type PartitionStateFunc func(stopCh chan struct{},
 	state string, pct float32, err error)
 
 // FindMoveFunc is a callback invoked by OrchestrateMoves() when it
-// wants to find the bext move out of a set of available moves for
-// node.  It should return the array index of the move that should be
-// used next.
-type FindMoveFunc func (node string, moves[]NodeStateOp) int
+// wants to find the best partition move out of a set of available
+// partition moves for node.  It should return the array index of the
+// partition move that should be used next.
+type FindMoveFunc func(node string, moves []PartitionMove) int
 
 // ------------------------------------------
 
-// A partitionMove struct represents a requested state assignment of a
-// partition on a node.
-type partitionMove struct {
-	partition string
+// A PartitionMove struct represents a state change of a partition on
+// a node.
+type PartitionMove struct {
+	Partition string
+
+	Node string
 
 	// Ex: "master", "replica".
-	state string
+	State string
 
 	// Same as NodeStateOp.Op: "add", "del", "promote", "demote".
-	op string
+	Op string
 }
 
 // A nextMoves struct is used to track a sequence of moves of a
@@ -210,9 +213,9 @@ func OrchestrateMoves(
 	findMove FindMoveFunc,
 ) (*Orchestrator, error) {
 	// Populate the mapNodeToPartitionMoveCh, keyed by node name.
-	mapNodeToPartitionMoveCh := map[string]chan partitionMove{}
+	mapNodeToPartitionMoveCh := map[string]chan PartitionMove{}
 	for _, node := range nodesAll {
-		mapNodeToPartitionMoveCh[node] = make(chan partitionMove)
+		mapNodeToPartitionMoveCh[node] = make(chan PartitionMove)
 	}
 
 	states := sortStateNames(model)
@@ -380,7 +383,7 @@ func (o *Orchestrator) ResumeNewAssignments() error {
 }
 
 func (o *Orchestrator) runMover(stopCh chan struct{},
-	partitionMoveCh chan partitionMove, node string) error {
+	partitionMoveCh chan PartitionMove, node string) error {
 	for {
 		select {
 		case _, ok := <-stopCh:
@@ -393,15 +396,15 @@ func (o *Orchestrator) runMover(stopCh chan struct{},
 				return nil
 			}
 
-			partition := partitionMove.partition
+			partition := partitionMove.Partition
 			if partition == "" {
 				return nil
 			}
 
-			state := partitionMove.state
+			state := partitionMove.State
 
 			err := o.assignPartition(stopCh,
-				partition, node, state, partitionMove.op)
+				partition, node, state, partitionMove.Op)
 			if err != nil {
 				return err
 			}
@@ -455,10 +458,11 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 				nodeStateOp := nextMoves.moves[nextMoves.next]
 				o.m.Unlock()
 
-				partitionMove := partitionMove{
-					partition: nextMoves.partition,
-					state:     nodeStateOp.State,
-					op:        nodeStateOp.Op,
+				partitionMove := PartitionMove{
+					Partition: nextMoves.partition,
+					Node:      nodeStateOp.Node,
+					State:     nodeStateOp.State,
+					Op:        nodeStateOp.Op,
 				}
 
 				select {
@@ -480,7 +484,7 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 				}
 
 				nodeFeedersDoneCh <- false
-			}(node, o.findBestNextMoves(node, nextMovesArr))
+			}(node, o.findNextMoves(node, nextMovesArr))
 		}
 
 		nodeFeedersStopChClosed := false
@@ -505,11 +509,19 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 	}
 }
 
-func (o *Orchestrator) findBestNextMoves(
+func (o *Orchestrator) findNextMoves(
 	node string, nextMovesArr []*nextMoves) *nextMoves {
-	moves := make([]NodeStateOp, len(nextMovesArr))
+	moves := make([]PartitionMove, len(nextMovesArr))
+
 	for i, nextMoves := range nextMovesArr {
-		moves[i] = nextMoves.moves[nextMoves.next]
+		m := nextMoves.moves[nextMoves.next]
+
+		moves[i] = PartitionMove{
+			Partition: nextMoves.partition,
+			Node:      m.Node,
+			State:     m.State,
+			Op:        m.Op,
+		}
 	}
 
 	return nextMovesArr[o.findMove(node, moves)]

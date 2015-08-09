@@ -484,7 +484,7 @@ func TestOrchestrateMoves(t *testing.T) {
 			test.endMap,
 			assignPartitionFunc,
 			partitionStateFunc,
-			LowestWeightMoveForNode,
+			LowestWeightPartitionMoveForNode,
 		)
 		if o == nil {
 			t.Errorf("testi: %d, label: %s,"+
