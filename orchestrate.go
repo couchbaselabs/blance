@@ -18,11 +18,59 @@ import (
 
 var ErrorStopped = errors.New("stopped")
 
+/*
+TODO: Some move prioritization heuristics to consider:
+
+First, favor easy promotions and demotions (e.g., a replica graduating
+to master) so that clients can have more coverage across all
+partitions. This is the equivalent of a VBucket changing state from
+replica to master.
+
+Next, favor assignments of partitions that have no replicas assigned
+anywhere, where we want to get to that first PIndex instance or
+replica as soon as possible. Once we have that first replica for a
+PIndex, though, we should consider favoring other kinds of moves over
+building even more replicas of that PIndex.
+
+Next, favor reassignments that utilize capacity on newly added cbft
+nodes, as the new nodes may be able to help with existing, overtaxed
+nodes. But be aware: starting off more KV backfills may push existing
+nodes running at the limit over the edge.
+
+Next, favor reassignments that help get partitions off of nodes that are
+leaving the cluster. The idea is to allow ns-server to remove
+couchbase nodes (which may need servicing) sooner.
+
+Next, favor removals of partitions that are over-replicated. For
+example, there might be too many replicas of a PIndex remaining on
+new/existing nodes.
+
+Lastly, favor reassignments that move partitions amongst cbft nodes than
+are neither joining nor leaving the cluster. In this case, MCP may
+need to shuffle partitions to achieve better balance or meet replication
+constraints.
+
+Other, more advanced factors to consider in the heuristics, which may
+be addressed in future releases, but would just be additions to the
+ordering/sorting algorithm.
+
+Some cbft nodes might be slower, less powerful and more impacted than
+others.
+
+Some partitions might be way behind compared to others.
+
+Some partitions might be much larger than others.
+
+Some partitions might have data sources under more pressure than
+others and less able to handle yet another a request for a data source
+full-scan (backfill).
+
+Perhaps consider how about some randomness?
+*/
+
 // An Orchestrator instance holds the runtime state during an
 // OrchestrateMoves() operation.
 type Orchestrator struct {
-	label string
-
 	model PartitionModel
 
 	options OrchestratorOptions
@@ -83,6 +131,8 @@ type PartitionStateFunc func(stopCh chan struct{},
 
 // ------------------------------------------
 
+// A partitionMove struct represents a requested state assignment of a
+// partition on a node.
 type partitionMove struct {
 	partition string
 
@@ -93,6 +143,8 @@ type partitionMove struct {
 	op string
 }
 
+// A nextMoves struct is used to track a sequence of moves of a
+// partition, including the next move that that needs to be taken.
 type nextMoves struct {
 	partition string // Immutable.
 
@@ -100,23 +152,23 @@ type nextMoves struct {
 	// represents the next available move for a partition.
 	next int
 
-	moves []NodeStateOp // Immutable.
+	// The sequence of moves can come from the output of the
+	// CalcPartitionMoves() function and is immutable.
+	moves []NodeStateOp
 }
 
 // ------------------------------------------
 
 // OrchestratorMoves asynchronously begins reassigning partitions
-// amongst nodes to transition from the begMap to the endMap state,
-// invoking the assignPartition() to affect changes.  Additionally,
-// the caller must read the progress channel until it's closed by
-// OrchestrateMoves to avoid blocking the orchestration.
-//
-// The label is used for debug/diagnostic messages.
+// amongst nodes in order to transition from the begMap to the endMap
+// state, invoking the assignPartition() to affect changes.
+// Additionally, the caller must read the progress channel until it's
+// closed by OrchestrateMoves to avoid blocking the orchestration, and
+// as a way to monitor progress.
 //
 // The nodesAll must be a union or superset of all the nodes during
 // the orchestration (nodes added, removed, unchanged).
 func OrchestrateMoves(
-	label string,
 	model PartitionModel,
 	options OrchestratorOptions,
 	nodesAll []string,
@@ -156,7 +208,6 @@ func OrchestrateMoves(
 	}
 
 	o := &Orchestrator{
-		label:           label,
 		model:           model,
 		options:         options,
 		nodesAll:        nodesAll,

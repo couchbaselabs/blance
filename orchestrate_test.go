@@ -475,7 +475,7 @@ func TestOrchestrateMoves(t *testing.T) {
 			return currState, 1.0, nil
 		}
 
-		o, err := OrchestrateMoves(test.label,
+		o, err := OrchestrateMoves(
 			test.partitionModel,
 			test.options,
 			test.nodesAll,
