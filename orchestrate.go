@@ -443,8 +443,6 @@ func (o *Orchestrator) runMover(stopCh chan struct{},
 			}
 		}
 	}
-
-	return nil
 }
 
 func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
