@@ -110,22 +110,27 @@ type OrchestratorOptions struct {
 // OrchestratorProgress represents progress counters and/or error
 // information as the OrchestrateMoves() operation proceeds.
 type OrchestratorProgress struct {
-	Errors                      []error
-	TotPartitionsAssigned       int
-	TotPartitionsAssignedDone   int
-	TotPartitionsUnassigned     int
-	TotPartitionsUnassignedDone int
-	TotRunMover                 int
-	TotRunMoverLoop             int
-	TotRunMoverDone             int
-	TotRunMoverDoneErr          int
-	TotRunSupplyMovesLoop       int
-	TotRunSupplyMovesDone       int
-	TotRunSupplyMovesPause      int
-	TotRunSupplyMovesResume     int
-	TotStop                     int
-	TotPauseNewAssignments      int
-	TotResumeNewAssignments     int
+	Errors                        []error
+	TotRunMover                   int
+	TotRunMoverLoop               int
+	TotRunMoverAssignPartition    int
+	TotRunMoverAssignPartitionOk  int
+	TotRunMoverAssignPartitionErr int
+	TotRunMoverWaitPartition      int
+	TotRunMoverWaitPartitionOk    int
+	TotRunMoverWaitPartitionErr   int
+	TotRunMoverDone               int
+	TotRunMoverDoneErr            int
+	TotRunSupplyMovesLoop         int
+	TotRunSupplyMovesLoopDone     int
+	TotRunSupplyMovesFeeding      int
+	TotRunSupplyMovesFeedingDone  int
+	TotRunSupplyMovesDone         int
+	TotRunSupplyMovesPause        int
+	TotRunSupplyMovesResume       int
+	TotStop                       int
+	TotPauseNewAssignments        int
+	TotResumeNewAssignments       int
 }
 
 // AssignPartitionFunc is a callback invoked by OrchestrateMoves()
@@ -430,17 +435,38 @@ func (o *Orchestrator) runMover(stopCh chan struct{},
 
 			state := partitionMove.State
 
+			o.m.Lock()
+			o.progress.TotRunMoverAssignPartition++
+			o.m.Unlock()
+
 			err := o.assignPartition(stopCh,
 				partition, node, state, partitionMove.Op)
 			if err != nil {
+				o.m.Lock()
+				o.progress.TotRunMoverAssignPartitionErr++
+				o.m.Unlock()
+
 				return err
 			}
+
+			o.m.Lock()
+			o.progress.TotRunMoverAssignPartitionOk++
+			o.progress.TotRunMoverWaitPartition++
+			o.m.Unlock()
 
 			err = o.waitForPartitionNodeState(stopCh,
 				partition, node, state)
 			if err != nil {
+				o.m.Lock()
+				o.progress.TotRunMoverWaitPartitionErr++
+				o.m.Unlock()
+
 				return err
 			}
+
+			o.m.Lock()
+			o.progress.TotRunMoverWaitPartitionOk++
+			o.m.Unlock()
 		}
 	}
 }
@@ -526,6 +552,10 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 			}(node, o.findNextMoves(node, nextMovesArr))
 		}
 
+		o.m.Lock()
+		o.progress.TotRunSupplyMovesFeeding++
+		o.m.Unlock()
+
 		nodeFeedersStopChClosed := false
 
 		for range availableMoves {
@@ -536,12 +566,20 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 			}
 		}
 
+		o.m.Lock()
+		o.progress.TotRunSupplyMovesFeedingDone++
+		o.m.Unlock()
+
 		if !nodeFeedersStopChClosed {
 			close(nodeFeedersStopCh)
 		}
 
 		close(nodeFeedersDoneCh)
 	}
+
+	o.m.Lock()
+	o.progress.TotRunSupplyMovesLoopDone++
+	o.m.Unlock()
 
 	for _, partitionMoveCh := range o.mapNodeToPartitionMoveCh {
 		close(partitionMoveCh)
