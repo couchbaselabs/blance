@@ -13,6 +13,7 @@ package blance
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 )
 
@@ -212,6 +213,10 @@ func OrchestrateMoves(
 	partitionState PartitionStateFunc,
 	findMove FindMoveFunc,
 ) (*Orchestrator, error) {
+	if len(begMap) != len(endMap) {
+		return nil, fmt.Errorf("mismatched begMap and endMap")
+	}
+
 	// Populate the mapNodeToPartitionMoveCh, keyed by node name.
 	mapNodeToPartitionMoveCh := map[string]chan PartitionMove{}
 	for _, node := range nodesAll {

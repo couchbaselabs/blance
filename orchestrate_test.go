@@ -13,20 +13,50 @@ type assignPartitionRec struct {
 	op        string
 }
 
+var mrPartitionModel = PartitionModel{
+	"master": &PartitionModelState{
+		Priority: 0,
+	},
+	"replica": &PartitionModelState{
+		Constraints: 1,
+	},
+}
+
+var options1 = OrchestratorOptions{
+	MaxConcurrentPartitionMovesPerNode: 1,
+}
+
+func TestOrchestrateBadMoves(t *testing.T) {
+	o, err := OrchestrateMoves(
+		mrPartitionModel,
+		options1,
+		nil,
+		PartitionMap{
+			"00": &Partition{
+				Name:         "00",
+				NodesByState: map[string][]string{},
+			},
+			"01": &Partition{
+				Name:         "01",
+				NodesByState: map[string][]string{},
+			},
+		},
+		PartitionMap{
+			"01": &Partition{
+				Name:         "01",
+				NodesByState: map[string][]string{},
+			},
+		},
+		nil,
+		nil,
+		nil,
+	)
+	if err == nil || o != nil {
+		t.Errorf("expected err on mismatched beg/end maps")
+	}
+}
+
 func TestOrchestrateMoves(t *testing.T) {
-	mrPartitionModel := PartitionModel{
-		"master": &PartitionModelState{
-			Priority: 0,
-		},
-		"replica": &PartitionModelState{
-			Constraints: 1,
-		},
-	}
-
-	options1 := OrchestratorOptions{
-		MaxConcurrentPartitionMovesPerNode: 1,
-	}
-
 	tests := []struct {
 		skip           bool
 		label          string
