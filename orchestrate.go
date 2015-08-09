@@ -116,8 +116,16 @@ type OrchestratorProgress struct {
 	TotPartitionsUnassigned     int
 	TotPartitionsUnassignedDone int
 	TotRunMover                 int
+	TotRunMoverLoop             int
 	TotRunMoverDone             int
 	TotRunMoverDoneErr          int
+	TotRunSupplyMovesLoop       int
+	TotRunSupplyMovesDone       int
+	TotRunSupplyMovesPause      int
+	TotRunSupplyMovesResume     int
+	TotStop                     int
+	TotPauseNewAssignments      int
+	TotResumeNewAssignments     int
 }
 
 // AssignPartitionFunc is a callback invoked by OrchestrateMoves()
@@ -352,6 +360,7 @@ func OrchestrateMoves(
 func (o *Orchestrator) Stop() {
 	o.m.Lock()
 	if o.stopCh != nil {
+		o.progress.TotStop++
 		close(o.stopCh)
 		o.stopCh = nil
 	}
@@ -377,6 +386,7 @@ func (o *Orchestrator) PauseNewAssignments() error {
 	o.m.Lock()
 	if o.pauseCh == nil {
 		o.pauseCh = make(chan struct{})
+		o.progress.TotPauseNewAssignments++
 	}
 	o.m.Unlock()
 	return nil
@@ -387,6 +397,7 @@ func (o *Orchestrator) PauseNewAssignments() error {
 func (o *Orchestrator) ResumeNewAssignments() error {
 	o.m.Lock()
 	if o.pauseCh != nil {
+		o.progress.TotResumeNewAssignments++
 		close(o.pauseCh)
 		o.pauseCh = nil
 	}
@@ -397,6 +408,10 @@ func (o *Orchestrator) ResumeNewAssignments() error {
 func (o *Orchestrator) runMover(stopCh chan struct{},
 	partitionMoveCh chan PartitionMove, node string) error {
 	for {
+		o.m.Lock()
+		o.progress.TotRunMoverLoop++
+		o.m.Unlock()
+
 		select {
 		case _, ok := <-stopCh:
 			if !ok {
@@ -441,6 +456,8 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 
 		o.m.Lock()
 
+		o.progress.TotRunSupplyMovesLoop++
+
 		for _, nextMoves := range o.mapPartitionToNextMoves {
 			if nextMoves.next < len(nextMoves.moves) {
 				node := nextMoves.moves[nextMoves.next].Node
@@ -458,7 +475,15 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 		}
 
 		if pauseCh != nil {
+			o.m.Lock()
+			o.progress.TotRunSupplyMovesPause++
+			o.m.Unlock()
+
 			<-pauseCh
+
+			o.m.Lock()
+			o.progress.TotRunSupplyMovesResume++
+			o.m.Unlock()
 		}
 
 		nodeFeedersStopCh := make(chan struct{})
@@ -519,6 +544,10 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 	for _, partitionMoveCh := range o.mapNodeToPartitionMoveCh {
 		close(partitionMoveCh)
 	}
+
+	o.m.Lock()
+	o.progress.TotRunSupplyMovesDone++
+	o.m.Unlock()
 }
 
 func (o *Orchestrator) findNextMoves(
