@@ -111,6 +111,9 @@ type OrchestratorOptions struct {
 // information as the OrchestrateMoves() operation proceeds.
 type OrchestratorProgress struct {
 	Errors                        []error
+	TotStop                       int
+	TotPauseNewAssignments        int
+	TotResumeNewAssignments       int
 	TotRunMover                   int
 	TotRunMoverLoop               int
 	TotRunMoverAssignPartition    int
@@ -128,9 +131,6 @@ type OrchestratorProgress struct {
 	TotRunSupplyMovesDone         int
 	TotRunSupplyMovesPause        int
 	TotRunSupplyMovesResume       int
-	TotStop                       int
-	TotPauseNewAssignments        int
-	TotResumeNewAssignments       int
 }
 
 // AssignPartitionFunc is a callback invoked by OrchestrateMoves()
