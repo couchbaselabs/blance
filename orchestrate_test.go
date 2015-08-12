@@ -111,7 +111,12 @@ func TestOrchestrateErrAssignPartitionFunc(t *testing.T) {
 	}
 }
 
-func TestOrchestratePauseResume(t *testing.T) {
+func testMkFuncs() (
+	map[string]map[string]string,
+	map[string][]assignPartitionRec,
+	AssignPartitionFunc,
+	PartitionStateFunc,
+) {
 	var m sync.Mutex
 
 	// Map of partition -> node -> state.
@@ -148,6 +153,13 @@ func TestOrchestratePauseResume(t *testing.T) {
 		m.Unlock()
 		return currState, 1.0, nil
 	}
+
+	return currStates, assignPartitionRecs,
+		assignPartitionFunc, partitionStateFunc
+}
+
+func TestOrchestratePauseResume(t *testing.T) {
+	_, _, assignPartitionFunc, partitionStateFunc := testMkFuncs()
 
 	o, err := OrchestrateMoves(
 		mrPartitionModel,
@@ -213,42 +225,7 @@ func TestOrchestratePauseResume(t *testing.T) {
 }
 
 func TestOrchestrateEarlyStop(t *testing.T) {
-	var m sync.Mutex
-
-	// Map of partition -> node -> state.
-	currStates := map[string]map[string]string{}
-
-	assignPartitionRecs := map[string][]assignPartitionRec{}
-
-	assignPartitionFunc := func(stopCh chan struct{},
-		partition, node, state, op string) error {
-		m.Lock()
-
-		assignPartitionRecs[partition] =
-			append(assignPartitionRecs[partition],
-				assignPartitionRec{partition, node, state, op})
-
-		nodes := currStates[partition]
-		if nodes == nil {
-			nodes = map[string]string{}
-			currStates[partition] = nodes
-		}
-
-		nodes[node] = state
-
-		m.Unlock()
-
-		return nil
-	}
-
-	partitionStateFunc := func(stopCh chan struct{},
-		partition string, node string) (
-		state string, pct float32, err error) {
-		m.Lock()
-		currState := currStates[partition][node]
-		m.Unlock()
-		return currState, 1.0, nil
-	}
+	_, _, assignPartitionFunc, partitionStateFunc := testMkFuncs()
 
 	o, err := OrchestrateMoves(
 		mrPartitionModel,
