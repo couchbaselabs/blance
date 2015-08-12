@@ -276,6 +276,94 @@ func testOrchestratePauseResume(t *testing.T, numProgress int) {
 	}
 }
 
+func TestOrchestrateErrPartitionState(t *testing.T) {
+	_, _, assignPartitionFunc, _ := testMkFuncs()
+
+	theErr := fmt.Errorf("theErr")
+
+	errPartitionStateFunc := func(stopCh chan struct{},
+		partition string, node string) (
+		state string, pct float32, err error) {
+		return "", 0.0, theErr
+	}
+
+	o, err := OrchestrateMoves(
+		mrPartitionModel,
+		OrchestratorOptions{},
+		[]string{"a", "b"},
+		PartitionMap{
+			"00": &Partition{
+				Name: "00",
+				NodesByState: map[string][]string{
+					"master":  []string{"a"},
+					"replica": []string{"b"},
+				},
+			},
+			"01": &Partition{
+				Name: "01",
+				NodesByState: map[string][]string{
+					"master":  []string{"a"},
+					"replica": []string{"b"},
+				},
+			},
+			"02": &Partition{
+				Name: "02",
+				NodesByState: map[string][]string{
+					"master":  []string{"a"},
+					"replica": []string{"b"},
+				},
+			},
+		},
+		PartitionMap{
+			"00": &Partition{
+				Name: "00",
+				NodesByState: map[string][]string{
+					"master":  []string{"b"},
+					"replica": []string{"a"},
+				},
+			},
+			"01": &Partition{
+				Name: "01",
+				NodesByState: map[string][]string{
+					"master":  []string{"b"},
+					"replica": []string{"a"},
+				},
+			},
+			"02": &Partition{
+				Name: "02",
+				NodesByState: map[string][]string{
+					"master":  []string{"b"},
+					"replica": []string{"a"},
+				},
+			},
+		},
+		assignPartitionFunc,
+		errPartitionStateFunc,
+		LowestWeightPartitionMoveForNode,
+	)
+	if err != nil || o == nil {
+		t.Errorf("expected nil err")
+	}
+
+	gotProgress := 0
+	var lastProgress OrchestratorProgress
+
+	for progress := range o.ProgressCh() {
+		gotProgress++
+		lastProgress = progress
+	}
+
+	o.Stop()
+
+	if gotProgress <= 0 {
+		t.Errorf("expected progress")
+	}
+
+	if len(lastProgress.Errors) <= 0 {
+		t.Errorf("expected errs")
+	}
+}
+
 func TestOrchestrateEarlyStop(t *testing.T) {
 	_, _, assignPartitionFunc, partitionStateFunc := testMkFuncs()
 
