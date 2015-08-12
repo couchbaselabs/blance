@@ -90,7 +90,8 @@ type Orchestrator struct {
 
 	progressCh chan OrchestratorProgress
 
-	mapNodeToPartitionMoveCh map[string]chan PartitionMove
+	// Keyed by node name.
+	mapNodeToPartitionMoveReqCh map[string]chan partitionMoveReq
 
 	m sync.Mutex // Protects the fields that follow.
 
@@ -98,6 +99,7 @@ type Orchestrator struct {
 	pauseCh  chan struct{} // May be nil; non-nil when paused.
 	progress OrchestratorProgress
 
+	// Keyed by partition name.
 	mapPartitionToNextMoves map[string]*nextMoves
 }
 
@@ -194,6 +196,13 @@ var MoveOpWeight = map[string]int{
 
 // ------------------------------------------
 
+// A partitionMoveReq wraps a partitionMove, allowing the receiver (a
+// mover) to signal that the move is completed by closing the doneCh.
+type partitionMoveReq struct {
+	partitionMove PartitionMove
+	doneCh        chan error
+}
+
 // A nextMoves struct is used to track a sequence of moves of a
 // partition, including the next move that that needs to be taken.
 type nextMoves struct {
@@ -202,6 +211,12 @@ type nextMoves struct {
 	// Mutable index or current position in the moves array that
 	// represents the next available move for a partition.
 	next int
+
+	// When non-nil, it means the move is already in-flight (was
+	// successfully fed to a mover) but hasn't finished yet, and the
+	// move supplier needs to wait for the nextDoneCh to be closed.
+	// The nextDoneCh == partitionMoveReq.doneCh.
+	nextDoneCh chan error
 
 	// The sequence of moves can come from the output of the
 	// CalcPartitionMoves() function and is immutable.
@@ -237,10 +252,10 @@ func OrchestrateMoves(
 		return nil, fmt.Errorf("mismatched begMap and endMap")
 	}
 
-	// Populate the mapNodeToPartitionMoveCh, keyed by node name.
-	mapNodeToPartitionMoveCh := map[string]chan PartitionMove{}
+	// Populate the mapNodeToPartitionMoveReqCh, keyed by node name.
+	mapNodeToPartitionMoveReqCh := map[string]chan partitionMoveReq{}
 	for _, node := range nodesAll {
-		mapNodeToPartitionMoveCh[node] = make(chan PartitionMove)
+		mapNodeToPartitionMoveReqCh[node] = make(chan partitionMoveReq)
 	}
 
 	states := sortStateNames(model)
@@ -278,7 +293,7 @@ func OrchestrateMoves(
 		findMove:        findMove,
 		progressCh:      make(chan OrchestratorProgress),
 
-		mapNodeToPartitionMoveCh: mapNodeToPartitionMoveCh,
+		mapNodeToPartitionMoveReqCh: mapNodeToPartitionMoveReqCh,
 
 		stopCh:  make(chan struct{}),
 		pauseCh: nil,
@@ -311,14 +326,15 @@ func OrchestrateMoves(
 
 				o.progressCh <- progress
 
-				// The partitionMoveCh has commands from the global,
-				// supreme airport controller on which airplane (or
-				// partition) should takeoff from the city airport
-				// next (but the supreme airport controller doesn't
-				// care which takeoff runway is used).
-				partitionMoveCh := o.mapNodeToPartitionMoveCh[node]
+				// The partitionMoveReqCh has commands from the
+				// global, supreme airport controller on which
+				// airplane (or partition) should takeoff from the
+				// city airport next (but the supreme airport
+				// controller doesn't care which takeoff runway at
+				// that airport is used).
+				partitionMoveReqCh := o.mapNodeToPartitionMoveReqCh[node]
 
-				runMoverDoneCh <- o.runMover(stopCh, partitionMoveCh, node)
+				runMoverDoneCh <- o.runMover(stopCh, partitionMoveReqCh, node)
 			}(node)
 		}
 	}
@@ -411,7 +427,7 @@ func (o *Orchestrator) ResumeNewAssignments() error {
 }
 
 func (o *Orchestrator) runMover(stopCh chan struct{},
-	partitionMoveCh chan PartitionMove, node string) error {
+	partitionMoveReqCh chan partitionMoveReq, node string) error {
 	for {
 		o.m.Lock()
 		o.progress.TotRunMoverLoop++
@@ -423,13 +439,19 @@ func (o *Orchestrator) runMover(stopCh chan struct{},
 				return nil
 			}
 
-		case partitionMove, ok := <-partitionMoveCh:
+		case partitionMoveReq, ok := <-partitionMoveReqCh:
 			if !ok {
 				return nil
 			}
 
+			partitionMove := partitionMoveReq.partitionMove
+
 			partition := partitionMove.Partition
 			if partition == "" {
+				if partitionMoveReq.doneCh != nil {
+					close(partitionMoveReq.doneCh)
+				}
+
 				return nil
 			}
 
@@ -446,6 +468,11 @@ func (o *Orchestrator) runMover(stopCh chan struct{},
 				o.progress.TotRunMoverAssignPartitionErr++
 				o.m.Unlock()
 
+				if partitionMoveReq.doneCh != nil {
+					partitionMoveReq.doneCh <- err
+					close(partitionMoveReq.doneCh)
+				}
+
 				return err
 			}
 
@@ -461,12 +488,21 @@ func (o *Orchestrator) runMover(stopCh chan struct{},
 				o.progress.TotRunMoverWaitPartitionErr++
 				o.m.Unlock()
 
+				if partitionMoveReq.doneCh != nil {
+					partitionMoveReq.doneCh <- err
+					close(partitionMoveReq.doneCh)
+				}
+
 				return err
 			}
 
 			o.m.Lock()
 			o.progress.TotRunMoverWaitPartitionOk++
 			o.m.Unlock()
+
+			if partitionMoveReq.doneCh != nil {
+				close(partitionMoveReq.doneCh)
+			}
 		}
 	}
 }
@@ -521,13 +557,40 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 			go func(node string, nextMoves *nextMoves) {
 				o.m.Lock()
 				nodeStateOp := nextMoves.moves[nextMoves.next]
+				nextDoneCh := nextMoves.nextDoneCh
 				o.m.Unlock()
 
-				partitionMove := PartitionMove{
-					Partition: nextMoves.partition,
-					Node:      nodeStateOp.Node,
-					State:     nodeStateOp.State,
-					Op:        nodeStateOp.Op,
+				if nextDoneCh == nil {
+					nextDoneCh = make(chan error)
+
+					pmr := partitionMoveReq{
+						partitionMove: PartitionMove{
+							Partition: nextMoves.partition,
+							Node:      nodeStateOp.Node,
+							State:     nodeStateOp.State,
+							Op:        nodeStateOp.Op,
+						},
+						doneCh: nextDoneCh,
+					}
+
+					select {
+					case <-stopCh:
+						o.m.Lock()
+						keepGoing = false
+						o.m.Unlock()
+
+						nodeFeedersDoneCh <- false
+						return
+
+					case <-nodeFeedersStopCh:
+						nodeFeedersDoneCh <- false
+						return
+
+					case o.mapNodeToPartitionMoveReqCh[node] <- pmr:
+						o.m.Lock()
+						nextMoves.nextDoneCh = nextDoneCh
+						o.m.Unlock()
+					}
 				}
 
 				select {
@@ -536,19 +599,19 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 					keepGoing = false
 					o.m.Unlock()
 
-				case <-nodeFeedersStopCh:
-					// NOOP.
+					nodeFeedersDoneCh <- false
 
-				case o.mapNodeToPartitionMoveCh[node] <- partitionMove:
+				case <-nodeFeedersStopCh:
+					nodeFeedersDoneCh <- false
+
+				case <-nextDoneCh:
 					o.m.Lock()
+					nextMoves.nextDoneCh = nil
 					nextMoves.next++
 					o.m.Unlock()
 
 					nodeFeedersDoneCh <- true
-					return
 				}
-
-				nodeFeedersDoneCh <- false
 			}(node, o.findNextMoves(node, nextMovesArr))
 		}
 
@@ -581,8 +644,8 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 	o.progress.TotRunSupplyMovesLoopDone++
 	o.m.Unlock()
 
-	for _, partitionMoveCh := range o.mapNodeToPartitionMoveCh {
-		close(partitionMoveCh)
+	for _, partitionMoveReqCh := range o.mapNodeToPartitionMoveReqCh {
+		close(partitionMoveReqCh)
 	}
 
 	o.m.Lock()
