@@ -111,6 +111,105 @@ func TestOrchestrateErrAssignPartitionFunc(t *testing.T) {
 	}
 }
 
+func TestOrchestratePause(t *testing.T) {
+	var m sync.Mutex
+
+	// Map of partition -> node -> state.
+	currStates := map[string]map[string]string{}
+
+	assignPartitionRecs := map[string][]assignPartitionRec{}
+
+	assignPartitionFunc := func(stopCh chan struct{},
+		partition, node, state, op string) error {
+		m.Lock()
+
+		assignPartitionRecs[partition] =
+			append(assignPartitionRecs[partition],
+				assignPartitionRec{partition, node, state, op})
+
+		nodes := currStates[partition]
+		if nodes == nil {
+			nodes = map[string]string{}
+			currStates[partition] = nodes
+		}
+
+		nodes[node] = state
+
+		m.Unlock()
+
+		return nil
+	}
+
+	partitionStateFunc := func(stopCh chan struct{},
+		partition string, node string) (
+		state string, pct float32, err error) {
+		m.Lock()
+		currState := currStates[partition][node]
+		m.Unlock()
+		return currState, 1.0, nil
+	}
+
+	o, err := OrchestrateMoves(
+		mrPartitionModel,
+		OrchestratorOptions{},
+		[]string{"a", "b"},
+		PartitionMap{
+			"00": &Partition{
+				Name: "00",
+				NodesByState: map[string][]string{
+					"master": []string{"a"},
+				},
+			},
+		},
+		PartitionMap{
+			"00": &Partition{
+				Name: "00",
+				NodesByState: map[string][]string{
+					"master": []string{"b"},
+				},
+			},
+		},
+		assignPartitionFunc,
+		partitionStateFunc,
+		LowestWeightPartitionMoveForNode,
+	)
+	if err != nil || o == nil {
+		t.Errorf("expected nil err")
+	}
+
+	<-o.ProgressCh()
+
+	o.PauseNewAssignments()
+	o.PauseNewAssignments()
+	o.PauseNewAssignments()
+
+	o.ResumeNewAssignments()
+	o.ResumeNewAssignments()
+
+	gotProgress := 0
+	var lastProgress OrchestratorProgress
+
+	for progress := range o.ProgressCh() {
+		gotProgress++
+		lastProgress = progress
+	}
+
+	o.Stop()
+
+	if gotProgress <= 0 {
+		t.Errorf("expected progress")
+	}
+
+	if len(lastProgress.Errors) > 0 {
+		t.Errorf("expected no errs")
+	}
+
+	if lastProgress.TotPauseNewAssignments != 1 ||
+		lastProgress.TotResumeNewAssignments != 1 {
+		t.Errorf("expected pause/resume of 1")
+	}
+}
+
 func TestOrchestrateMoves(t *testing.T) {
 	tests := []struct {
 		skip           bool
