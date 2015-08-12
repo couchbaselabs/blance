@@ -186,21 +186,21 @@ func testOrchestratePauseResume(t *testing.T, numProgress int) {
 			"00": &Partition{
 				Name: "00",
 				NodesByState: map[string][]string{
-					"master": []string{"a"},
+					"master":  []string{"a"},
 					"replica": []string{"b"},
 				},
 			},
 			"01": &Partition{
 				Name: "01",
 				NodesByState: map[string][]string{
-					"master": []string{"a"},
+					"master":  []string{"a"},
 					"replica": []string{"b"},
 				},
 			},
 			"02": &Partition{
 				Name: "02",
 				NodesByState: map[string][]string{
-					"master": []string{"a"},
+					"master":  []string{"a"},
 					"replica": []string{"b"},
 				},
 			},
@@ -209,21 +209,21 @@ func testOrchestratePauseResume(t *testing.T, numProgress int) {
 			"00": &Partition{
 				Name: "00",
 				NodesByState: map[string][]string{
-					"master": []string{"b"},
+					"master":  []string{"b"},
 					"replica": []string{"a"},
 				},
 			},
 			"01": &Partition{
 				Name: "01",
 				NodesByState: map[string][]string{
-					"master": []string{"b"},
+					"master":  []string{"b"},
 					"replica": []string{"a"},
 				},
 			},
 			"02": &Partition{
 				Name: "02",
 				NodesByState: map[string][]string{
-					"master": []string{"b"},
+					"master":  []string{"b"},
 					"replica": []string{"a"},
 				},
 			},
