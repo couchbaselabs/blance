@@ -857,6 +857,169 @@ func TestOrchestrateMoves(t *testing.T) {
 			},
 			expectErr: nil,
 		},
+		{
+			label:          "more concurrent moves",
+			partitionModel: mrPartitionModel,
+			options:        options1,
+			nodesAll:       []string{"a", "b", "c", "d", "e", "f", "g"},
+			begMap: PartitionMap{
+				"00": &Partition{
+					Name: "00",
+					NodesByState: map[string][]string{
+						"master":  []string{"a"},
+						"replica": []string{"b"},
+					},
+				},
+				"01": &Partition{
+					Name: "01",
+					NodesByState: map[string][]string{
+						"master":  []string{"b"},
+						"replica": []string{"c"},
+					},
+				},
+				"02": &Partition{
+					Name: "02",
+					NodesByState: map[string][]string{
+						"master":  []string{"c"},
+						"replica": []string{"d"},
+					},
+				},
+				"03": &Partition{
+					Name: "03",
+					NodesByState: map[string][]string{
+						"master":  []string{"d"},
+						"replica": []string{"e"},
+					},
+				},
+				"04": &Partition{
+					Name: "04",
+					NodesByState: map[string][]string{
+						"master":  []string{"e"},
+						"replica": []string{"f"},
+					},
+				},
+				"05": &Partition{
+					Name: "05",
+					NodesByState: map[string][]string{
+						"master":  []string{"f"},
+						"replica": []string{"g"},
+					},
+				},
+			},
+			endMap: PartitionMap{
+				"00": &Partition{
+					Name: "00",
+					NodesByState: map[string][]string{
+						"master":  []string{"b"},
+						"replica": []string{"c"},
+					},
+				},
+				"01": &Partition{
+					Name: "01",
+					NodesByState: map[string][]string{
+						"master":  []string{"c"},
+						"replica": []string{"d"},
+					},
+				},
+				"02": &Partition{
+					Name: "02",
+					NodesByState: map[string][]string{
+						"master":  []string{"d"},
+						"replica": []string{"e"},
+					},
+				},
+				"03": &Partition{
+					Name: "03",
+					NodesByState: map[string][]string{
+						"master":  []string{"e"},
+						"replica": []string{"f"},
+					},
+				},
+				"04": &Partition{
+					Name: "04",
+					NodesByState: map[string][]string{
+						"master":  []string{"f"},
+						"replica": []string{"g"},
+					},
+				},
+				"05": &Partition{
+					Name: "05",
+					NodesByState: map[string][]string{
+						"master":  []string{"g"},
+						"replica": []string{"a"},
+					},
+				},
+			},
+			expectAssignPartitions: map[string][]assignPartitionRec{
+				"00": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "00", node: "b", state: "master",
+					},
+					assignPartitionRec{
+						partition: "00", node: "a", state: "",
+					},
+					assignPartitionRec{
+						partition: "00", node: "c", state: "replica",
+					},
+				},
+				"01": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "01", node: "c", state: "master",
+					},
+					assignPartitionRec{
+						partition: "01", node: "b", state: "",
+					},
+					assignPartitionRec{
+						partition: "01", node: "d", state: "replica",
+					},
+				},
+				"02": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "02", node: "d", state: "master",
+					},
+					assignPartitionRec{
+						partition: "02", node: "c", state: "",
+					},
+					assignPartitionRec{
+						partition: "02", node: "e", state: "replica",
+					},
+				},
+				"03": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "03", node: "e", state: "master",
+					},
+					assignPartitionRec{
+						partition: "03", node: "d", state: "",
+					},
+					assignPartitionRec{
+						partition: "03", node: "f", state: "replica",
+					},
+				},
+				"04": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "04", node: "f", state: "master",
+					},
+					assignPartitionRec{
+						partition: "04", node: "e", state: "",
+					},
+					assignPartitionRec{
+						partition: "04", node: "g", state: "replica",
+					},
+				},
+				"05": []assignPartitionRec{
+					assignPartitionRec{
+						partition: "05", node: "g", state: "master",
+					},
+					assignPartitionRec{
+						partition: "05", node: "f", state: "",
+					},
+					assignPartitionRec{
+						partition: "05", node: "a", state: "replica",
+					},
+				},
+			},
+			expectErr: nil,
+		},
 	}
 
 	for testi, test := range tests {
