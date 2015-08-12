@@ -169,6 +169,15 @@ func TestOrchestrateMidPauseResume(t *testing.T) {
 func testOrchestratePauseResume(t *testing.T, numProgress int) {
 	_, _, assignPartitionFunc, partitionStateFunc := testMkFuncs()
 
+	pauseCh := make(chan struct{})
+
+	slowPartitionStateFunc := func(stopCh chan struct{},
+		partition string, node string) (
+		state string, pct float32, err error) {
+		<-pauseCh
+		return partitionStateFunc(stopCh, partition, node)
+	}
+
 	o, err := OrchestrateMoves(
 		mrPartitionModel,
 		OrchestratorOptions{},
@@ -178,6 +187,21 @@ func testOrchestratePauseResume(t *testing.T, numProgress int) {
 				Name: "00",
 				NodesByState: map[string][]string{
 					"master": []string{"a"},
+					"replica": []string{"b"},
+				},
+			},
+			"01": &Partition{
+				Name: "01",
+				NodesByState: map[string][]string{
+					"master": []string{"a"},
+					"replica": []string{"b"},
+				},
+			},
+			"02": &Partition{
+				Name: "02",
+				NodesByState: map[string][]string{
+					"master": []string{"a"},
+					"replica": []string{"b"},
 				},
 			},
 		},
@@ -186,11 +210,26 @@ func testOrchestratePauseResume(t *testing.T, numProgress int) {
 				Name: "00",
 				NodesByState: map[string][]string{
 					"master": []string{"b"},
+					"replica": []string{"a"},
+				},
+			},
+			"01": &Partition{
+				Name: "01",
+				NodesByState: map[string][]string{
+					"master": []string{"b"},
+					"replica": []string{"a"},
+				},
+			},
+			"02": &Partition{
+				Name: "02",
+				NodesByState: map[string][]string{
+					"master": []string{"b"},
+					"replica": []string{"a"},
 				},
 			},
 		},
 		assignPartitionFunc,
-		partitionStateFunc,
+		slowPartitionStateFunc,
 		LowestWeightPartitionMoveForNode,
 	)
 	if err != nil || o == nil {
@@ -207,6 +246,8 @@ func testOrchestratePauseResume(t *testing.T, numProgress int) {
 
 	o.ResumeNewAssignments()
 	o.ResumeNewAssignments()
+
+	close(pauseCh)
 
 	gotProgress := 0
 	var lastProgress OrchestratorProgress
