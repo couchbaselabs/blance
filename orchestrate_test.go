@@ -56,6 +56,61 @@ func TestOrchestrateBadMoves(t *testing.T) {
 	}
 }
 
+func TestOrchestrateErrAssignPartitionFunc(t *testing.T) {
+	theErr := fmt.Errorf("theErr")
+
+	errAssignPartitionFunc := func(stopCh chan struct{},
+		partition, node, state, op string) error {
+		return theErr
+	}
+
+	o, err := OrchestrateMoves(
+		mrPartitionModel,
+		OrchestratorOptions{},
+		[]string{"a", "b"},
+		PartitionMap{
+			"00": &Partition{
+				Name: "00",
+				NodesByState: map[string][]string{
+					"master": []string{"a"},
+				},
+			},
+		},
+		PartitionMap{
+			"00": &Partition{
+				Name: "00",
+				NodesByState: map[string][]string{
+					"master": []string{"b"},
+				},
+			},
+		},
+		errAssignPartitionFunc,
+		nil,
+		LowestWeightPartitionMoveForNode,
+	)
+	if err != nil || o == nil {
+		t.Errorf("expected nil err")
+	}
+
+	gotProgress := 0
+	var lastProgress OrchestratorProgress
+
+	for progress := range o.ProgressCh() {
+		gotProgress++
+		lastProgress = progress
+	}
+
+	o.Stop()
+
+	if gotProgress <= 0 {
+		t.Errorf("expected progress")
+	}
+
+	if len(lastProgress.Errors) <= 0 {
+		t.Errorf("expected errs")
+	}
+}
+
 func TestOrchestrateMoves(t *testing.T) {
 	tests := []struct {
 		skip           bool
