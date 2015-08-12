@@ -807,43 +807,8 @@ func TestOrchestrateMoves(t *testing.T) {
 			continue
 		}
 
-		var m sync.Mutex
-
-		// Map of partition -> node -> state.
-		currStates := map[string]map[string]string{}
-
-		assignPartitionRecs := map[string][]assignPartitionRec{}
-
-		assignPartitionFunc := func(stopCh chan struct{},
-			partition, node, state, op string) error {
-			m.Lock()
-
-			assignPartitionRecs[partition] =
-				append(assignPartitionRecs[partition],
-					assignPartitionRec{partition, node, state, op})
-
-			nodes := currStates[partition]
-			if nodes == nil {
-				nodes = map[string]string{}
-				currStates[partition] = nodes
-			}
-
-			nodes[node] = state
-
-			m.Unlock()
-
-			return nil
-		}
-
-		partitionStateFunc := func(stopCh chan struct{},
-			partition string, node string) (
-			state string, pct float32, err error) {
-			m.Lock()
-			currState := currStates[partition][node]
-			m.Unlock()
-
-			return currState, 1.0, nil
-		}
+		_, assignPartitionRecs,
+			assignPartitionFunc, partitionStateFunc := testMkFuncs()
 
 		o, err := OrchestrateMoves(
 			test.partitionModel,
