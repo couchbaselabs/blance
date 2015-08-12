@@ -158,7 +158,15 @@ func testMkFuncs() (
 		assignPartitionFunc, partitionStateFunc
 }
 
-func TestOrchestratePauseResume(t *testing.T) {
+func TestOrchestrateEarlyPauseResume(t *testing.T) {
+	testOrchestratePauseResume(t, 1)
+}
+
+func TestOrchestrateMidPauseResume(t *testing.T) {
+	testOrchestratePauseResume(t, 2)
+}
+
+func testOrchestratePauseResume(t *testing.T, numProgress int) {
 	_, _, assignPartitionFunc, partitionStateFunc := testMkFuncs()
 
 	o, err := OrchestrateMoves(
@@ -189,7 +197,9 @@ func TestOrchestratePauseResume(t *testing.T) {
 		t.Errorf("expected nil err")
 	}
 
-	<-o.ProgressCh()
+	for i := 0; i < numProgress; i++ {
+		<-o.ProgressCh()
+	}
 
 	o.PauseNewAssignments()
 	o.PauseNewAssignments()
@@ -220,7 +230,8 @@ func TestOrchestratePauseResume(t *testing.T) {
 
 	if lastProgress.TotPauseNewAssignments != 1 ||
 		lastProgress.TotResumeNewAssignments != 1 {
-		t.Errorf("expected pause/resume of 1")
+		t.Errorf("numProgress: %d, expected pause/resume of 1, got: %#v",
+			numProgress, lastProgress)
 	}
 }
 
