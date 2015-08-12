@@ -445,16 +445,7 @@ func (o *Orchestrator) runMover(stopCh chan struct{},
 			}
 
 			partitionMove := partitionMoveReq.partitionMove
-
 			partition := partitionMove.Partition
-			if partition == "" {
-				if partitionMoveReq.doneCh != nil {
-					close(partitionMoveReq.doneCh)
-				}
-
-				return nil
-			}
-
 			state := partitionMove.State
 
 			o.m.Lock()
