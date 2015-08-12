@@ -486,7 +486,7 @@ func (r *partitionSorter) Score(i int) []string {
 	// If the partitionName looks like a positive integer, then
 	// zero-pad it for sortability.
 	partitionN, err := strconv.Atoi(partitionName)
-	if err != nil && partitionN >= 0 {
+	if err == nil && partitionN >= 0 {
 		partitionNameStr = fmt.Sprintf("%10d", partitionN)
 	}
 
