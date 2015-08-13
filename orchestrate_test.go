@@ -276,6 +276,121 @@ func testOrchestratePauseResume(t *testing.T, numProgress int) {
 	}
 }
 
+// Another attempt at pause/resume testing that tries to exercise
+// pause/resume code paths in the moves supplier.
+func TestOrchestratePauseResumeIntoMovesSupplier(t *testing.T) {
+	testOrchestratePauseResumeIntoMovesSupplier(t, 2, 1)
+}
+
+func testOrchestratePauseResumeIntoMovesSupplier(t *testing.T,
+	numProgressBeforePause, numFastPartitionStateFuncs int) {
+	_, _, assignPartitionFunc, partitionStateFunc := testMkFuncs()
+
+	var m sync.Mutex
+	numPartitionStateFuncs := 0
+
+	slowCh := make(chan struct{})
+
+	slowPartitionStateFunc := func(stopCh chan struct{},
+		partition string, node string) (
+		state string, pct float32, err error) {
+		m.Lock()
+		numPartitionStateFuncs++
+		n := numPartitionStateFuncs
+		m.Unlock()
+
+		if n > numFastPartitionStateFuncs {
+			<-slowCh
+		}
+
+		return partitionStateFunc(stopCh, partition, node)
+	}
+
+	o, err := OrchestrateMoves(
+		mrPartitionModel,
+		OrchestratorOptions{},
+		[]string{"a", "b", "c"},
+		PartitionMap{
+			"00": &Partition{
+				Name: "00",
+				NodesByState: map[string][]string{
+					"master":  []string{"a"},
+					"replica": []string{"b"},
+				},
+			},
+			"01": &Partition{
+				Name: "01",
+				NodesByState: map[string][]string{
+					"master":  []string{"b"},
+					"replica": []string{"c"},
+				},
+			},
+		},
+		PartitionMap{
+			"00": &Partition{
+				Name: "00",
+				NodesByState: map[string][]string{
+					"master":  []string{"b"},
+					"replica": []string{"c"},
+				},
+			},
+			"01": &Partition{
+				Name: "01",
+				NodesByState: map[string][]string{
+					"master":  []string{"c"},
+					"replica": []string{"a"},
+				},
+			},
+		},
+		assignPartitionFunc,
+		slowPartitionStateFunc,
+		LowestWeightPartitionMoveForNode,
+	)
+	if err != nil || o == nil {
+		t.Errorf("expected nil err")
+	}
+
+	for i := 0; i < numProgressBeforePause; i++ {
+		<-o.ProgressCh()
+	}
+
+	o.PauseNewAssignments()
+	o.PauseNewAssignments()
+	o.PauseNewAssignments()
+
+	o.ResumeNewAssignments()
+	o.ResumeNewAssignments()
+
+	close(slowCh)
+
+	gotProgress := 0
+	var lastProgress OrchestratorProgress
+
+	for progress := range o.ProgressCh() {
+		gotProgress++
+		lastProgress = progress
+
+		o.ResumeNewAssignments()
+	}
+
+	o.Stop()
+
+	if gotProgress <= 0 {
+		t.Errorf("expected progress")
+	}
+
+	if len(lastProgress.Errors) > 0 {
+		t.Errorf("expected no errs")
+	}
+
+	if lastProgress.TotPauseNewAssignments != 1 ||
+		lastProgress.TotResumeNewAssignments != 1 {
+		t.Errorf("numProgressBeforePause: %d,"+
+			" expected pause/resume of 1, got: %#v",
+			numProgressBeforePause, lastProgress)
+	}
+}
+
 func TestOrchestrateErrPartitionState(t *testing.T) {
 	_, _, assignPartitionFunc, _ := testMkFuncs()
 
