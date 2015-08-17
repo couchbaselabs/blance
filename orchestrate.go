@@ -532,65 +532,9 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 		// then stop the broadcast (via nodeFeedersStopCh) so that we
 		// can repeat the outer loop to re-calculate available moves.
 		for node, nextMovesArr := range availableMoves {
-			go func(node string, nextMoves *nextMoves) {
-				o.m.Lock()
-				nodeStateOp := nextMoves.moves[nextMoves.next]
-				nextDoneCh := nextMoves.nextDoneCh
-				o.m.Unlock()
-
-				if nextDoneCh == nil {
-					nextDoneCh = make(chan error)
-
-					pmr := partitionMoveReq{
-						partitionMove: PartitionMove{
-							Partition: nextMoves.partition,
-							Node:      nodeStateOp.Node,
-							State:     nodeStateOp.State,
-							Op:        nodeStateOp.Op,
-						},
-						doneCh: nextDoneCh,
-					}
-
-					select {
-					case <-stopCh:
-						o.m.Lock()
-						keepGoing = false
-						o.m.Unlock()
-
-						nodeFeedersDoneCh <- errorNotFed
-						return
-
-					case <-nodeFeedersStopCh:
-						nodeFeedersDoneCh <- errorNotFed
-						return
-
-					case o.mapNodeToPartitionMoveReqCh[node] <- pmr:
-						o.m.Lock()
-						nextMoves.nextDoneCh = nextDoneCh
-						o.m.Unlock()
-					}
-				}
-
-				select {
-				case <-stopCh:
-					o.m.Lock()
-					keepGoing = false
-					o.m.Unlock()
-
-					nodeFeedersDoneCh <- errorNotFed
-
-				case <-nodeFeedersStopCh:
-					nodeFeedersDoneCh <- errorNotFed
-
-				case err := <-nextDoneCh:
-					o.m.Lock()
-					nextMoves.nextDoneCh = nil
-					nextMoves.next++
-					o.m.Unlock()
-
-					nodeFeedersDoneCh <- err
-				}
-			}(node, o.findNextMoves(node, nextMovesArr))
+			go o.runSupplyMove(stopCh, node,
+				o.findNextMoves(node, nextMovesArr), &keepGoing,
+				nodeFeedersStopCh, nodeFeedersDoneCh)
 		}
 
 		o.m.Lock()
@@ -629,6 +573,69 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 	o.m.Lock()
 	o.progress.TotRunSupplyMovesDone++
 	o.m.Unlock()
+}
+
+func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
+	node string, nextMoves *nextMoves, keepGoing *bool,
+	nodeFeedersStopCh chan struct{},
+	nodeFeedersDoneCh chan error) {
+	o.m.Lock()
+	nodeStateOp := nextMoves.moves[nextMoves.next]
+	nextDoneCh := nextMoves.nextDoneCh
+	o.m.Unlock()
+
+	if nextDoneCh == nil {
+		nextDoneCh = make(chan error)
+
+		pmr := partitionMoveReq{
+			partitionMove: PartitionMove{
+				Partition: nextMoves.partition,
+				Node:      nodeStateOp.Node,
+				State:     nodeStateOp.State,
+				Op:        nodeStateOp.Op,
+			},
+			doneCh: nextDoneCh,
+		}
+
+		select {
+		case <-stopCh:
+			o.m.Lock()
+			*keepGoing = false
+			o.m.Unlock()
+
+			nodeFeedersDoneCh <- errorNotFed
+			return
+
+		case <-nodeFeedersStopCh:
+			nodeFeedersDoneCh <- errorNotFed
+			return
+
+		case o.mapNodeToPartitionMoveReqCh[node] <- pmr:
+			o.m.Lock()
+			nextMoves.nextDoneCh = nextDoneCh
+			o.m.Unlock()
+		}
+	}
+
+	select {
+	case <-stopCh:
+		o.m.Lock()
+		*keepGoing = false
+		o.m.Unlock()
+
+		nodeFeedersDoneCh <- errorNotFed
+
+	case <-nodeFeedersStopCh:
+		nodeFeedersDoneCh <- errorNotFed
+
+	case err := <-nextDoneCh:
+		o.m.Lock()
+		nextMoves.nextDoneCh = nil
+		nextMoves.next++
+		o.m.Unlock()
+
+		nodeFeedersDoneCh <- err
+	}
 }
 
 func (o *Orchestrator) findNextMoves(
