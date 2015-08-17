@@ -18,6 +18,7 @@ import (
 )
 
 var ErrorStopped = errors.New("stopped")
+var ErrorInterrupt = errors.New("interrupt")
 
 /*
 TODO: Some move prioritization heuristics to consider:
@@ -131,6 +132,7 @@ type OrchestratorProgress struct {
 	TotRunSupplyMovesFeeding      int
 	TotRunSupplyMovesFeedingDone  int
 	TotRunSupplyMovesDone         int
+	TotRunSupplyMovesDoneErr      int
 	TotRunSupplyMovesPause        int
 	TotRunSupplyMovesResume       int
 }
@@ -334,10 +336,7 @@ func OrchestrateMoves(
 	// city's airport (or node), this global, supreme airport
 	// controller chooses which plane (or partition) gets to takeoff
 	// next.
-	go o.runSupplyMoves(stopCh)
-
-	// Wait for movers to finish and then cleanup.
-	go o.waitForAllMoversDone(m, runMoverDoneCh)
+	go o.runSupplyMoves(stopCh, m, runMoverDoneCh)
 
 	return o, nil
 }
@@ -483,12 +482,11 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 	}
 }
 
-var errorNotFed = errors.New("not-fed")
+func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
+	m int, runMoverDoneCh chan error) {
+	var errOuter error
 
-func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
-	keepGoing := true
-
-	for keepGoing {
+	for errOuter == nil {
 		// The availableMoves is keyed by node name.
 		availableMoves := map[string][]*nextMoves{}
 
@@ -533,7 +531,7 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 
 		for node, nextMovesArr := range availableMoves {
 			go o.runSupplyMove(stopCh, node,
-				o.findNextMoves(node, nextMovesArr), &keepGoing,
+				o.findNextMoves(node, nextMovesArr),
 				broadcastStopCh, broadcastDoneCh)
 		}
 
@@ -548,6 +546,12 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 			if err == nil && !broadcastStopChClosed {
 				close(broadcastStopCh)
 				broadcastStopChClosed = true
+			}
+
+			if err != nil &&
+				err != ErrorInterrupt &&
+				errOuter == nil {
+				errOuter = err
 			}
 		}
 
@@ -570,13 +574,26 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 		close(partitionMoveReqCh)
 	}
 
+	// Wait for movers to finish and then cleanup.
+	o.waitForAllMoversDone(m, runMoverDoneCh)
+
 	o.m.Lock()
 	o.progress.TotRunSupplyMovesDone++
+	if errOuter != nil &&
+		errOuter != ErrorStopped {
+		o.progress.Errors = append(o.progress.Errors, errOuter)
+		o.progress.TotRunSupplyMovesDoneErr++
+	}
+	progress := o.progress
 	o.m.Unlock()
+
+	o.progressCh <- progress
+
+	close(o.progressCh)
 }
 
 func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
-	node string, nextMoves *nextMoves, keepGoing *bool,
+	node string, nextMoves *nextMoves,
 	broadcastStopCh chan struct{},
 	broadcastDoneCh chan error) {
 	o.m.Lock()
@@ -599,15 +616,11 @@ func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
 
 		select {
 		case <-stopCh:
-			o.m.Lock()
-			*keepGoing = false
-			o.m.Unlock()
-
-			broadcastDoneCh <- errorNotFed
+			broadcastDoneCh <- ErrorStopped
 			return
 
 		case <-broadcastStopCh:
-			broadcastDoneCh <- errorNotFed
+			broadcastDoneCh <- ErrorInterrupt
 			return
 
 		case o.mapNodeToPartitionMoveReqCh[node] <- pmr:
@@ -619,14 +632,10 @@ func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
 
 	select {
 	case <-stopCh:
-		o.m.Lock()
-		*keepGoing = false
-		o.m.Unlock()
-
-		broadcastDoneCh <- errorNotFed
+		broadcastDoneCh <- ErrorStopped
 
 	case <-broadcastStopCh:
-		broadcastDoneCh <- errorNotFed
+		broadcastDoneCh <- ErrorInterrupt
 
 	case err := <-nextDoneCh:
 		o.m.Lock()
@@ -680,7 +689,8 @@ func (o *Orchestrator) waitForPartitionNodeState(
 	}
 }
 
-func (o *Orchestrator) waitForAllMoversDone(m int, runMoverDoneCh chan error) {
+func (o *Orchestrator) waitForAllMoversDone(
+	m int, runMoverDoneCh chan error) {
 	for i := 0; i < len(o.nodesAll)*m; i++ {
 		err := <-runMoverDoneCh
 
@@ -695,6 +705,4 @@ func (o *Orchestrator) waitForAllMoversDone(m int, runMoverDoneCh chan error) {
 
 		o.progressCh <- progress
 	}
-
-	close(o.progressCh)
 }
