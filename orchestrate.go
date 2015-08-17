@@ -524,30 +524,30 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 			o.m.Unlock()
 		}
 
-		nodeFeedersStopCh := make(chan struct{})
-		nodeFeedersDoneCh := make(chan error)
-
 		// Broadcast to every node mover their next, best move, and
 		// when the one or more node movers is successfully "fed",
-		// then stop the broadcast (via nodeFeedersStopCh) so that we
+		// then stop the broadcast (via broadcastStopCh) so that we
 		// can repeat the outer loop to re-calculate available moves.
+		broadcastStopCh := make(chan struct{})
+		broadcastDoneCh := make(chan error)
+
 		for node, nextMovesArr := range availableMoves {
 			go o.runSupplyMove(stopCh, node,
 				o.findNextMoves(node, nextMovesArr), &keepGoing,
-				nodeFeedersStopCh, nodeFeedersDoneCh)
+				broadcastStopCh, broadcastDoneCh)
 		}
 
 		o.m.Lock()
 		o.progress.TotRunSupplyMovesFeeding++
 		o.m.Unlock()
 
-		nodeFeedersStopChClosed := false
+		broadcastStopChClosed := false
 
 		for range availableMoves {
-			err := <-nodeFeedersDoneCh
-			if err == nil && !nodeFeedersStopChClosed {
-				close(nodeFeedersStopCh)
-				nodeFeedersStopChClosed = true
+			err := <-broadcastDoneCh
+			if err == nil && !broadcastStopChClosed {
+				close(broadcastStopCh)
+				broadcastStopChClosed = true
 			}
 		}
 
@@ -555,11 +555,11 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 		o.progress.TotRunSupplyMovesFeedingDone++
 		o.m.Unlock()
 
-		if !nodeFeedersStopChClosed {
-			close(nodeFeedersStopCh)
+		if !broadcastStopChClosed {
+			close(broadcastStopCh)
 		}
 
-		close(nodeFeedersDoneCh)
+		close(broadcastDoneCh)
 	}
 
 	o.m.Lock()
@@ -577,8 +577,8 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 
 func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
 	node string, nextMoves *nextMoves, keepGoing *bool,
-	nodeFeedersStopCh chan struct{},
-	nodeFeedersDoneCh chan error) {
+	broadcastStopCh chan struct{},
+	broadcastDoneCh chan error) {
 	o.m.Lock()
 	nodeStateOp := nextMoves.moves[nextMoves.next]
 	nextDoneCh := nextMoves.nextDoneCh
@@ -603,11 +603,11 @@ func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
 			*keepGoing = false
 			o.m.Unlock()
 
-			nodeFeedersDoneCh <- errorNotFed
+			broadcastDoneCh <- errorNotFed
 			return
 
-		case <-nodeFeedersStopCh:
-			nodeFeedersDoneCh <- errorNotFed
+		case <-broadcastStopCh:
+			broadcastDoneCh <- errorNotFed
 			return
 
 		case o.mapNodeToPartitionMoveReqCh[node] <- pmr:
@@ -623,10 +623,10 @@ func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
 		*keepGoing = false
 		o.m.Unlock()
 
-		nodeFeedersDoneCh <- errorNotFed
+		broadcastDoneCh <- errorNotFed
 
-	case <-nodeFeedersStopCh:
-		nodeFeedersDoneCh <- errorNotFed
+	case <-broadcastStopCh:
+		broadcastDoneCh <- errorNotFed
 
 	case err := <-nextDoneCh:
 		o.m.Lock()
@@ -634,7 +634,7 @@ func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
 		nextMoves.next++
 		o.m.Unlock()
 
-		nodeFeedersDoneCh <- err
+		broadcastDoneCh <- err
 	}
 }
 
