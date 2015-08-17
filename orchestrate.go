@@ -393,12 +393,9 @@ func (o *Orchestrator) ResumeNewAssignments() error {
 
 func (o *Orchestrator) runMover(
 	stopCh chan struct{}, runMoverDoneCh chan error, node string) {
-	o.m.Lock()
-	o.progress.TotRunMover++
-	progress := o.progress
-	o.m.Unlock()
-
-	o.progressCh <- progress
+	o.updateProgress(func() {
+		o.progress.TotRunMover++
+	})
 
 	// The partitionMoveReqCh has commands from the global, supreme
 	// airport controller on which airplane (or partition) should
@@ -413,9 +410,9 @@ func (o *Orchestrator) runMover(
 func (o *Orchestrator) moverLoop(stopCh chan struct{},
 	partitionMoveReqCh chan partitionMoveReq, node string) error {
 	for {
-		o.m.Lock()
-		o.progress.TotRunMoverLoop++
-		o.m.Unlock()
+		o.updateProgress(func() {
+			o.progress.TotRunMoverLoop++
+		})
 
 		select {
 		case _, ok := <-stopCh:
@@ -432,16 +429,16 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 			partition := partitionMove.Partition
 			state := partitionMove.State
 
-			o.m.Lock()
-			o.progress.TotRunMoverAssignPartition++
-			o.m.Unlock()
+			o.updateProgress(func() {
+				o.progress.TotRunMoverAssignPartition++
+			})
 
 			err := o.assignPartition(stopCh,
 				partition, node, state, partitionMove.Op)
 			if err != nil {
-				o.m.Lock()
-				o.progress.TotRunMoverAssignPartitionErr++
-				o.m.Unlock()
+				o.updateProgress(func() {
+					o.progress.TotRunMoverAssignPartitionErr++
+				})
 
 				if partitionMoveReq.doneCh != nil {
 					partitionMoveReq.doneCh <- err
@@ -451,17 +448,17 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 				return err
 			}
 
-			o.m.Lock()
-			o.progress.TotRunMoverAssignPartitionOk++
-			o.progress.TotRunMoverWaitPartition++
-			o.m.Unlock()
+			o.updateProgress(func() {
+				o.progress.TotRunMoverAssignPartitionOk++
+				o.progress.TotRunMoverWaitPartition++
+			})
 
 			err = o.waitForPartitionNodeState(stopCh,
 				partition, node, state)
 			if err != nil {
-				o.m.Lock()
-				o.progress.TotRunMoverWaitPartitionErr++
-				o.m.Unlock()
+				o.updateProgress(func() {
+					o.progress.TotRunMoverWaitPartitionErr++
+				})
 
 				if partitionMoveReq.doneCh != nil {
 					partitionMoveReq.doneCh <- err
@@ -471,9 +468,9 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 				return err
 			}
 
-			o.m.Lock()
-			o.progress.TotRunMoverWaitPartitionOk++
-			o.m.Unlock()
+			o.updateProgress(func() {
+				o.progress.TotRunMoverWaitPartitionOk++
+			})
 
 			if partitionMoveReq.doneCh != nil {
 				close(partitionMoveReq.doneCh)
@@ -490,9 +487,11 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 		// The availableMoves is keyed by node name.
 		availableMoves := map[string][]*nextMoves{}
 
-		o.m.Lock()
+		o.updateProgress(func() {
+			o.progress.TotRunSupplyMovesLoop++
+		})
 
-		o.progress.TotRunSupplyMovesLoop++
+		o.m.Lock()
 
 		for _, nextMoves := range o.mapPartitionToNextMoves {
 			if nextMoves.next < len(nextMoves.moves) {
@@ -511,15 +510,15 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 		}
 
 		if pauseCh != nil {
-			o.m.Lock()
-			o.progress.TotRunSupplyMovesPause++
-			o.m.Unlock()
+			o.updateProgress(func() {
+				o.progress.TotRunSupplyMovesPause++
+			})
 
 			<-pauseCh
 
-			o.m.Lock()
-			o.progress.TotRunSupplyMovesResume++
-			o.m.Unlock()
+			o.updateProgress(func() {
+				o.progress.TotRunSupplyMovesResume++
+			})
 		}
 
 		// Broadcast to every node mover their next, best move, and
@@ -535,9 +534,9 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 				broadcastStopCh, broadcastDoneCh)
 		}
 
-		o.m.Lock()
-		o.progress.TotRunSupplyMovesFeeding++
-		o.m.Unlock()
+		o.updateProgress(func() {
+			o.progress.TotRunSupplyMovesFeeding++
+		})
 
 		broadcastStopChClosed := false
 
@@ -555,9 +554,9 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 			}
 		}
 
-		o.m.Lock()
-		o.progress.TotRunSupplyMovesFeedingDone++
-		o.m.Unlock()
+		o.updateProgress(func() {
+			o.progress.TotRunSupplyMovesFeedingDone++
+		})
 
 		if !broadcastStopChClosed {
 			close(broadcastStopCh)
@@ -566,28 +565,25 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 		close(broadcastDoneCh)
 	}
 
-	o.m.Lock()
-	o.progress.TotRunSupplyMovesLoopDone++
-	o.m.Unlock()
+	o.updateProgress(func() {
+		o.progress.TotRunSupplyMovesLoopDone++
+	})
 
 	for _, partitionMoveReqCh := range o.mapNodeToPartitionMoveReqCh {
 		close(partitionMoveReqCh)
 	}
 
+	o.updateProgress(func() {
+		o.progress.TotRunSupplyMovesDone++
+		if errOuter != nil &&
+			errOuter != ErrorStopped {
+			o.progress.Errors = append(o.progress.Errors, errOuter)
+			o.progress.TotRunSupplyMovesDoneErr++
+		}
+	})
+
 	// Wait for movers to finish and then cleanup.
 	o.waitForAllMoversDone(m, runMoverDoneCh)
-
-	o.m.Lock()
-	o.progress.TotRunSupplyMovesDone++
-	if errOuter != nil &&
-		errOuter != ErrorStopped {
-		o.progress.Errors = append(o.progress.Errors, errOuter)
-		o.progress.TotRunSupplyMovesDoneErr++
-	}
-	progress := o.progress
-	o.m.Unlock()
-
-	o.progressCh <- progress
 
 	close(o.progressCh)
 }
@@ -694,15 +690,24 @@ func (o *Orchestrator) waitForAllMoversDone(
 	for i := 0; i < len(o.nodesAll)*m; i++ {
 		err := <-runMoverDoneCh
 
-		o.m.Lock()
-		o.progress.TotRunMoverDone++
-		if err != nil {
-			o.progress.Errors = append(o.progress.Errors, err)
-			o.progress.TotRunMoverDoneErr++
-		}
-		progress := o.progress
-		o.m.Unlock()
-
-		o.progressCh <- progress
+		o.updateProgress(func() {
+			o.progress.TotRunMoverDone++
+			if err != nil {
+				o.progress.Errors = append(o.progress.Errors, err)
+				o.progress.TotRunMoverDoneErr++
+			}
+		})
 	}
+}
+
+func (o *Orchestrator) updateProgress(f func()) {
+	o.m.Lock()
+
+	f()
+
+	progress := o.progress
+
+	o.m.Unlock()
+
+	o.progressCh <- progress
 }
