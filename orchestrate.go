@@ -483,6 +483,8 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 	}
 }
 
+var errorNotFed = errors.New("not-fed")
+
 func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 	keepGoing := true
 
@@ -523,7 +525,7 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 		}
 
 		nodeFeedersStopCh := make(chan struct{})
-		nodeFeedersDoneCh := make(chan bool)
+		nodeFeedersDoneCh := make(chan error)
 
 		// Broadcast to every node mover their next, best move, and
 		// when the one or more node movers is successfully "fed",
@@ -555,11 +557,11 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 						keepGoing = false
 						o.m.Unlock()
 
-						nodeFeedersDoneCh <- false
+						nodeFeedersDoneCh <- errorNotFed
 						return
 
 					case <-nodeFeedersStopCh:
-						nodeFeedersDoneCh <- false
+						nodeFeedersDoneCh <- errorNotFed
 						return
 
 					case o.mapNodeToPartitionMoveReqCh[node] <- pmr:
@@ -575,18 +577,18 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 					keepGoing = false
 					o.m.Unlock()
 
-					nodeFeedersDoneCh <- false
+					nodeFeedersDoneCh <- errorNotFed
 
 				case <-nodeFeedersStopCh:
-					nodeFeedersDoneCh <- false
+					nodeFeedersDoneCh <- errorNotFed
 
-				case <-nextDoneCh:
+				case err := <-nextDoneCh:
 					o.m.Lock()
 					nextMoves.nextDoneCh = nil
 					nextMoves.next++
 					o.m.Unlock()
 
-					nodeFeedersDoneCh <- true
+					nodeFeedersDoneCh <- err
 				}
 			}(node, o.findNextMoves(node, nextMovesArr))
 		}
@@ -598,8 +600,8 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{}) {
 		nodeFeedersStopChClosed := false
 
 		for range availableMoves {
-			wasFed := <-nodeFeedersDoneCh
-			if wasFed && !nodeFeedersStopChClosed {
+			err := <-nodeFeedersDoneCh
+			if err == nil && !nodeFeedersStopChClosed {
 				close(nodeFeedersStopCh)
 				nodeFeedersStopChClosed = true
 			}
