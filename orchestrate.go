@@ -118,31 +118,32 @@ type OrchestratorOptions struct {
 type OrchestratorProgress struct {
 	Errors []error
 
-	TotStop                       int
-	TotPauseNewAssignments        int
-	TotResumeNewAssignments       int
-	TotRunMover                   int
-	TotRunMoverLoop               int
-	TotRunMoverAssignPartition    int
-	TotRunMoverAssignPartitionOk  int
-	TotRunMoverAssignPartitionErr int
-	TotRunMoverDone               int
-	TotRunMoverDoneErr            int
-	TotRunSupplyMovesLoop         int
-	TotRunSupplyMovesLoopDone     int
-	TotRunSupplyMovesFeeding      int
-	TotRunSupplyMovesFeedingDone  int
-	TotRunSupplyMovesDone         int
-	TotRunSupplyMovesDoneErr      int
-	TotRunSupplyMovesPause        int
-	TotRunSupplyMovesResume       int
+	TotStop                      int
+	TotPauseNewAssignments       int
+	TotResumeNewAssignments      int
+	TotRunMover                  int
+	TotRunMoverDone              int
+	TotRunMoverDoneErr           int
+	TotMoverLoop                 int
+	TotMoverAssignPartition      int
+	TotMoverAssignPartitionOk    int
+	TotMoverAssignPartitionErr   int
+	TotRunSupplyMovesLoop        int
+	TotRunSupplyMovesLoopDone    int
+	TotRunSupplyMovesFeeding     int
+	TotRunSupplyMovesFeedingDone int
+	TotRunSupplyMovesDone        int
+	TotRunSupplyMovesDoneErr     int
+	TotRunSupplyMovesPause       int
+	TotRunSupplyMovesResume      int
+	TotProgressClose             int
 }
 
 // AssignPartitionFunc is a callback invoked by OrchestrateMoves()
-// when it wants to asynchronously assign a partition to a node at a
+// when it wants to synchronously assign a partition to a node at a
 // given state, or change the state of an existing partition on a
 // node.  The state will be "" if the partition should be removed or
-// deleted from the ndoe.
+// deleted from the node.
 type AssignPartitionFunc func(stopCh chan struct{},
 	partition string,
 	node string,
@@ -410,7 +411,7 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 	partitionMoveReqCh chan partitionMoveReq, node string) error {
 	for {
 		o.updateProgress(func() {
-			o.progress.TotRunMoverLoop++
+			o.progress.TotMoverLoop++
 		})
 
 		select {
@@ -429,14 +430,14 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 			state := partitionMove.State
 
 			o.updateProgress(func() {
-				o.progress.TotRunMoverAssignPartition++
+				o.progress.TotMoverAssignPartition++
 			})
 
 			err := o.assignPartition(stopCh,
 				partition, node, state, partitionMove.Op)
 			if err != nil {
 				o.updateProgress(func() {
-					o.progress.TotRunMoverAssignPartitionErr++
+					o.progress.TotMoverAssignPartitionErr++
 				})
 
 				if partitionMoveReq.doneCh != nil {
@@ -448,7 +449,7 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 			}
 
 			o.updateProgress(func() {
-				o.progress.TotRunMoverAssignPartitionOk++
+				o.progress.TotMoverAssignPartitionOk++
 			})
 
 			if partitionMoveReq.doneCh != nil {
@@ -561,6 +562,10 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 
 	// Wait for movers to finish.
 	o.waitForAllMoversDone(m, runMoverDoneCh)
+
+	o.updateProgress(func() {
+		o.progress.TotProgressClose++
+	})
 
 	close(o.progressCh)
 }
