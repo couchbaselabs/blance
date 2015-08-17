@@ -484,22 +484,14 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 	var errOuter error
 
 	for errOuter == nil {
-		// The availableMoves is keyed by node name.
-		availableMoves := map[string][]*nextMoves{}
-
 		o.updateProgress(func() {
 			o.progress.TotRunSupplyMovesLoop++
 		})
 
 		o.m.Lock()
 
-		for _, nextMoves := range o.mapPartitionToNextMoves {
-			if nextMoves.next < len(nextMoves.moves) {
-				node := nextMoves.moves[nextMoves.next].Node
-				availableMoves[node] =
-					append(availableMoves[node], nextMoves)
-			}
-		}
+		// The availableMoves is keyed by node name.
+		availableMoves := o.calcAvailableMoves_unlocked()
 
 		pauseCh := o.pauseCh
 
@@ -582,7 +574,7 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 		}
 	})
 
-	// Wait for movers to finish and then cleanup.
+	// Wait for movers to finish.
 	o.waitForAllMoversDone(m, runMoverDoneCh)
 
 	close(o.progressCh)
@@ -666,6 +658,7 @@ func (o *Orchestrator) waitForPartitionNodeState(
 	partition string,
 	node string,
 	state string) error {
+	// TODO: Sleep a bit rather than spamming partitionState()?
 	for {
 		select {
 		case <-stopCh:
@@ -710,4 +703,20 @@ func (o *Orchestrator) updateProgress(f func()) {
 	o.m.Unlock()
 
 	o.progressCh <- progress
+}
+
+func (o *Orchestrator) calcAvailableMoves_unlocked() (
+	availableMoves map[string][]*nextMoves) {
+	// The availableMoves is keyed by node name.
+	availableMoves = map[string][]*nextMoves{}
+
+	for _, nextMoves := range o.mapPartitionToNextMoves {
+		if nextMoves.next < len(nextMoves.moves) {
+			node := nextMoves.moves[nextMoves.next].Node
+			availableMoves[node] =
+				append(availableMoves[node], nextMoves)
+		}
+	}
+
+	return availableMoves
 }
