@@ -21,12 +21,16 @@ var ErrorStopped = errors.New("stopped")
 var ErrorInterrupt = errors.New("interrupt")
 
 /*
-TODO: Some move prioritization heuristics to consider:
+We let the app have detailed control of the prioritization heuristics
+via the FindMoveFunc callback.
 
-First, favor easy, single-node promotions and demotions (e.g., a
-replica partition graduating to master on the same node) because
-single-node state changes should be fast and so that clients can have
-more coverage across all partitions.  The
+But, there are some move prioritization heuristics for users of
+OrchestrateMoves to consider.
+
+Some apps might first favor easy, single-node promotions and demotions
+(e.g., a replica partition graduating to master on the same node)
+because single-node state changes should be fast and so that clients
+can have more coverage across all partitions.  The
 LowestWeightPartitionMoveForNode() implementation does this now.
 
 Next, favor assignments of partitions that have no replicas assigned
@@ -35,8 +39,8 @@ replica as soon as possible. Once we have that first replica for a
 PIndex, though, we should consider favoring other kinds of moves over
 building even more replicas of that PIndex.
 
-Next, favor reassignments that utilize capacity on newly added cbft
-nodes, as the new nodes may be able to help with existing, overtaxed
+Next, favor reassignments that utilize capacity on newly added nodes,
+as the new nodes may be able to help with existing, overtaxed
 nodes. But be aware: starting off more KV backfills may push existing
 nodes running at the limit over the edge.
 
@@ -48,16 +52,16 @@ Next, favor removals of partitions that are over-replicated. For
 example, there might be too many replicas of a PIndex remaining on
 new/existing nodes.
 
-Lastly, favor reassignments that move partitions amongst cbft nodes than
-are neither joining nor leaving the cluster. In this case, MCP may
-need to shuffle partitions to achieve better balance or meet replication
-constraints.
+Lastly, favor reassignments that move partitions amongst nodes than
+are neither joining nor leaving the cluster. In this case, the system
+may need to shuffle partitions to achieve better balance or meet
+replication constraints.
 
 Other, more advanced factors to consider in the heuristics, which may
 be addressed in future releases, but would just be additions to the
 ordering/sorting algorithm.
 
-Some cbft nodes might be slower, less powerful and more impacted than
+Some nodes might be slower, less powerful and more impacted than
 others.
 
 Some partitions might be way behind compared to others.
@@ -80,10 +84,10 @@ type Orchestrator struct {
 
 	options OrchestratorOptions
 
-	nodesAll []string
+	nodesAll []string // Union of all nodes (entering, leaving, remaining).
 
-	begMap PartitionMap
-	endMap PartitionMap
+	begMap PartitionMap // The map state that we start with.
+	endMap PartitionMap // The map state we want to end up with.
 
 	assignPartition AssignPartitionFunc
 	partitionState  PartitionStateFunc
@@ -113,7 +117,8 @@ type OrchestratorOptions struct {
 // OrchestratorProgress represents progress counters and/or error
 // information as the OrchestrateMoves() operation proceeds.
 type OrchestratorProgress struct {
-	Errors                        []error
+	Errors []error
+
 	TotStop                       int
 	TotPauseNewAssignments        int
 	TotResumeNewAssignments       int
@@ -391,6 +396,11 @@ func (o *Orchestrator) ResumeNewAssignments() error {
 	return nil // TODO.
 }
 
+// runMover handles partition moves for a single node.
+//
+// There may be >1 runMover's for a single node for higher
+// concurrency, just as a city airport might have more than one
+// takeoff runway.
 func (o *Orchestrator) runMover(
 	stopCh chan struct{}, runMoverDoneCh chan error, node string) {
 	o.updateProgress(func() {
@@ -407,6 +417,8 @@ func (o *Orchestrator) runMover(
 	runMoverDoneCh <- o.moverLoop(stopCh, partitionMoveReqCh, node)
 }
 
+// moverLoop handles partitionMoveReq's by invoking the
+// assignPartition() and partitionState() callbacks().
 func (o *Orchestrator) moverLoop(stopCh chan struct{},
 	partitionMoveReqCh chan partitionMoveReq, node string) error {
 	for {
@@ -479,6 +491,9 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 	}
 }
 
+// runSupplyMoves "broadcasts" available partitionMoveReq's to movers.
+// The broadcast is implemented via repeated "rounds" of spawning off
+// concurrent helper goroutines of runSupplyMove()'s for each node.
 func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 	m int, runMoverDoneCh chan error) {
 	var errOuter error
@@ -491,7 +506,7 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 		o.m.Lock()
 
 		// The availableMoves is keyed by node name.
-		availableMoves := o.calcAvailableMoves_unlocked()
+		availableMoves := o.findAvailableMoves_unlocked()
 
 		pauseCh := o.pauseCh
 
@@ -501,6 +516,8 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 			break
 		}
 
+		// The main pause/resume handling is via pausing/resuming the
+		// runSupplyMoves loop.
 		if pauseCh != nil {
 			o.updateProgress(func() {
 				o.progress.TotRunSupplyMovesPause++
@@ -513,10 +530,7 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 			})
 		}
 
-		// Broadcast to every node mover their next, best move, and
-		// when the one or more node movers is successfully "fed",
-		// then stop the broadcast (via broadcastStopCh) so that we
-		// can repeat the outer loop to re-calculate available moves.
+		// Broadcast to every node mover their next, best move.
 		broadcastStopCh := make(chan struct{})
 		broadcastDoneCh := make(chan error)
 
@@ -530,6 +544,10 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 			o.progress.TotRunSupplyMovesFeeding++
 		})
 
+		// When the one or more node movers is successfully "fed" (via
+		// broadcastDoneCh), then stop the broadcast (via
+		// broadcastStopCh) so that we can repeat the outer loop to
+		// re-calculate another round of available moves.
 		broadcastStopChClosed := false
 
 		for range availableMoves {
@@ -580,6 +598,8 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 	close(o.progressCh)
 }
 
+// runSupplyMove tries to send a single partitionMoveReq to a single
+// node, along with handling the broadcast interruptions.
 func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
 	node string, nextMoves *nextMoves,
 	broadcastStopCh chan struct{},
@@ -635,6 +655,7 @@ func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
 	}
 }
 
+// findNextMoves invokes the application's FindMoveFunc callback.
 func (o *Orchestrator) findNextMoves(
 	node string, nextMovesArr []*nextMoves) *nextMoves {
 	moves := make([]PartitionMove, len(nextMovesArr))
@@ -653,6 +674,9 @@ func (o *Orchestrator) findNextMoves(
 	return nextMovesArr[o.findMove(node, moves)]
 }
 
+// waitForPartitionModeState invokes the application's
+// PartitionStateFunc callback until it reaches done'ness on a desired
+// partition/node/state.
 func (o *Orchestrator) waitForPartitionNodeState(
 	stopCh chan struct{},
 	partition string,
@@ -672,12 +696,15 @@ func (o *Orchestrator) waitForPartitionNodeState(
 			return err
 		}
 
+		// TODO: Better policy on waiting and "done"-ness.
 		if currState == state && currPct >= 0.99 {
 			return nil
 		}
 	}
 }
 
+// waitForAllMoversDone returns when all concurrent movers have
+// finished, propagating any of their errors to the progressCh.
 func (o *Orchestrator) waitForAllMoversDone(
 	m int, runMoverDoneCh chan error) {
 	for i := 0; i < len(o.nodesAll)*m; i++ {
@@ -693,6 +720,8 @@ func (o *Orchestrator) waitForAllMoversDone(
 	}
 }
 
+// updateProgress is a helper func to allow for progress updates and
+// sends progress events to the progressCh.
 func (o *Orchestrator) updateProgress(f func()) {
 	o.m.Lock()
 
@@ -705,7 +734,9 @@ func (o *Orchestrator) updateProgress(f func()) {
 	o.progressCh <- progress
 }
 
-func (o *Orchestrator) calcAvailableMoves_unlocked() (
+// findAvailableMoves_unlocked returns the next round of available
+// moves.
+func (o *Orchestrator) findAvailableMoves_unlocked() (
 	availableMoves map[string][]*nextMoves) {
 	// The availableMoves is keyed by node name.
 	availableMoves = map[string][]*nextMoves{}
