@@ -354,24 +354,7 @@ func OrchestrateMoves(
 	go o.runSupplyMoves(stopCh)
 
 	// Wait for movers to finish and then cleanup.
-	go func() {
-		for i := 0; i < len(o.nodesAll)*m; i++ {
-			err := <-runMoverDoneCh
-
-			o.m.Lock()
-			o.progress.TotRunMoverDone++
-			if err != nil {
-				o.progress.Errors = append(o.progress.Errors, err)
-				o.progress.TotRunMoverDoneErr++
-			}
-			progress := o.progress
-			o.m.Unlock()
-
-			o.progressCh <- progress
-		}
-
-		close(o.progressCh)
-	}()
+	go o.waitForAllMoversDone(m, runMoverDoneCh)
 
 	return o, nil
 }
@@ -684,4 +667,23 @@ func (o *Orchestrator) waitForPartitionNodeState(
 			return nil
 		}
 	}
+}
+
+func (o *Orchestrator) waitForAllMoversDone(m int, runMoverDoneCh chan error) {
+	for i := 0; i < len(o.nodesAll)*m; i++ {
+		err := <-runMoverDoneCh
+
+		o.m.Lock()
+		o.progress.TotRunMoverDone++
+		if err != nil {
+			o.progress.Errors = append(o.progress.Errors, err)
+			o.progress.TotRunMoverDoneErr++
+		}
+		progress := o.progress
+		o.m.Unlock()
+
+		o.progressCh <- progress
+	}
+
+	close(o.progressCh)
 }
