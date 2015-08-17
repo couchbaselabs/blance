@@ -318,24 +318,7 @@ func OrchestrateMoves(
 
 	for _, node := range o.nodesAll {
 		for i := 0; i < m; i++ {
-			go func(node string) {
-				o.m.Lock()
-				o.progress.TotRunMover++
-				progress := o.progress
-				o.m.Unlock()
-
-				o.progressCh <- progress
-
-				// The partitionMoveReqCh has commands from the
-				// global, supreme airport controller on which
-				// airplane (or partition) should takeoff from the
-				// city airport next (but the supreme airport
-				// controller doesn't care which takeoff runway at
-				// that airport is used).
-				partitionMoveReqCh := o.mapNodeToPartitionMoveReqCh[node]
-
-				runMoverDoneCh <- o.runMover(stopCh, partitionMoveReqCh, node)
-			}(node)
+			go o.runMover(stopCh, runMoverDoneCh, node)
 		}
 	}
 
@@ -409,7 +392,26 @@ func (o *Orchestrator) ResumeNewAssignments() error {
 	return nil // TODO.
 }
 
-func (o *Orchestrator) runMover(stopCh chan struct{},
+func (o *Orchestrator) runMover(
+	stopCh chan struct{}, runMoverDoneCh chan error, node string) {
+	o.m.Lock()
+	o.progress.TotRunMover++
+	progress := o.progress
+	o.m.Unlock()
+
+	o.progressCh <- progress
+
+	// The partitionMoveReqCh has commands from the global, supreme
+	// airport controller on which airplane (or partition) should
+	// takeoff from the city airport next (but the supreme airport
+	// controller doesn't care which takeoff runway at that airport is
+	// used).
+	partitionMoveReqCh := o.mapNodeToPartitionMoveReqCh[node]
+
+	runMoverDoneCh <- o.moverLoop(stopCh, partitionMoveReqCh, node)
+}
+
+func (o *Orchestrator) moverLoop(stopCh chan struct{},
 	partitionMoveReqCh chan partitionMoveReq, node string) error {
 	for {
 		o.m.Lock()
