@@ -90,7 +90,6 @@ type Orchestrator struct {
 	endMap PartitionMap // The map state we want to end up with.
 
 	assignPartition AssignPartitionFunc
-	partitionState  PartitionStateFunc
 	findMove        FindMoveFunc
 
 	progressCh chan OrchestratorProgress
@@ -127,9 +126,6 @@ type OrchestratorProgress struct {
 	TotRunMoverAssignPartition    int
 	TotRunMoverAssignPartitionOk  int
 	TotRunMoverAssignPartitionErr int
-	TotRunMoverWaitPartition      int
-	TotRunMoverWaitPartitionOk    int
-	TotRunMoverWaitPartitionErr   int
 	TotRunMoverDone               int
 	TotRunMoverDoneErr            int
 	TotRunSupplyMovesLoop         int
@@ -152,13 +148,6 @@ type AssignPartitionFunc func(stopCh chan struct{},
 	node string,
 	state string,
 	op string) error
-
-// PartitionStateFunc is a callback invoked by OrchestrateMoves()
-// when it wants to synchronously retrieve information about a
-// partition on a node.
-type PartitionStateFunc func(stopCh chan struct{},
-	partition string, node string) (
-	state string, pct float32, err error)
 
 // FindMoveFunc is a callback invoked by OrchestrateMoves() when it
 // wants to find the best partition move out of a set of available
@@ -252,7 +241,6 @@ func OrchestrateMoves(
 	begMap PartitionMap,
 	endMap PartitionMap,
 	assignPartition AssignPartitionFunc,
-	partitionState PartitionStateFunc,
 	findMove FindMoveFunc,
 ) (*Orchestrator, error) {
 	if len(begMap) != len(endMap) {
@@ -296,7 +284,6 @@ func OrchestrateMoves(
 		begMap:          begMap,
 		endMap:          endMap,
 		assignPartition: assignPartition,
-		partitionState:  partitionState,
 		findMove:        findMove,
 		progressCh:      make(chan OrchestratorProgress),
 
@@ -418,7 +405,7 @@ func (o *Orchestrator) runMover(
 }
 
 // moverLoop handles partitionMoveReq's by invoking the
-// assignPartition() and partitionState() callbacks().
+// assignPartition callback.
 func (o *Orchestrator) moverLoop(stopCh chan struct{},
 	partitionMoveReqCh chan partitionMoveReq, node string) error {
 	for {
@@ -462,26 +449,6 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 
 			o.updateProgress(func() {
 				o.progress.TotRunMoverAssignPartitionOk++
-				o.progress.TotRunMoverWaitPartition++
-			})
-
-			err = o.waitForPartitionNodeState(stopCh,
-				partition, node, state)
-			if err != nil {
-				o.updateProgress(func() {
-					o.progress.TotRunMoverWaitPartitionErr++
-				})
-
-				if partitionMoveReq.doneCh != nil {
-					partitionMoveReq.doneCh <- err
-					close(partitionMoveReq.doneCh)
-				}
-
-				return err
-			}
-
-			o.updateProgress(func() {
-				o.progress.TotRunMoverWaitPartitionOk++
 			})
 
 			if partitionMoveReq.doneCh != nil {
@@ -672,35 +639,6 @@ func (o *Orchestrator) findNextMoves(
 	}
 
 	return nextMovesArr[o.findMove(node, moves)]
-}
-
-// waitForPartitionModeState invokes the application's
-// PartitionStateFunc callback until it reaches done'ness on a desired
-// partition/node/state.
-func (o *Orchestrator) waitForPartitionNodeState(
-	stopCh chan struct{},
-	partition string,
-	node string,
-	state string) error {
-	// TODO: Sleep a bit rather than spamming partitionState()?
-	for {
-		select {
-		case <-stopCh:
-			return ErrorStopped
-		default:
-		}
-
-		currState, currPct, err :=
-			o.partitionState(stopCh, partition, node)
-		if err != nil {
-			return err
-		}
-
-		// TODO: Better policy on waiting and "done"-ness.
-		if currState == state && currPct >= 0.99 {
-			return nil
-		}
-	}
 }
 
 // waitForAllMoversDone returns when all concurrent movers have

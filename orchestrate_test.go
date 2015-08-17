@@ -49,7 +49,6 @@ func TestOrchestrateBadMoves(t *testing.T) {
 		},
 		nil,
 		nil,
-		nil,
 	)
 	if err == nil || o != nil {
 		t.Errorf("expected err on mismatched beg/end maps")
@@ -85,7 +84,6 @@ func TestOrchestrateErrAssignPartitionFunc(t *testing.T) {
 			},
 		},
 		errAssignPartitionFunc,
-		nil,
 		LowestWeightPartitionMoveForNode,
 	)
 	if err != nil || o == nil {
@@ -115,7 +113,6 @@ func testMkFuncs() (
 	map[string]map[string]string,
 	map[string][]assignPartitionRec,
 	AssignPartitionFunc,
-	PartitionStateFunc,
 ) {
 	var m sync.Mutex
 
@@ -145,17 +142,7 @@ func testMkFuncs() (
 		return nil
 	}
 
-	partitionStateFunc := func(stopCh chan struct{},
-		partition string, node string) (
-		state string, pct float32, err error) {
-		m.Lock()
-		currState := currStates[partition][node]
-		m.Unlock()
-		return currState, 1.0, nil
-	}
-
-	return currStates, assignPartitionRecs,
-		assignPartitionFunc, partitionStateFunc
+	return currStates, assignPartitionRecs, assignPartitionFunc
 }
 
 func TestOrchestrateEarlyPauseResume(t *testing.T) {
@@ -167,15 +154,14 @@ func TestOrchestrateMidPauseResume(t *testing.T) {
 }
 
 func testOrchestratePauseResume(t *testing.T, numProgress int) {
-	_, _, assignPartitionFunc, partitionStateFunc := testMkFuncs()
+	_, _, assignPartitionFunc := testMkFuncs()
 
 	pauseCh := make(chan struct{})
 
-	slowPartitionStateFunc := func(stopCh chan struct{},
-		partition string, node string) (
-		state string, pct float32, err error) {
+	slowAssignPartitionFunc := func(stopCh chan struct{},
+		partition string, node string, state string, op string) error {
 		<-pauseCh
-		return partitionStateFunc(stopCh, partition, node)
+		return assignPartitionFunc(stopCh, partition, node, state, op)
 	}
 
 	o, err := OrchestrateMoves(
@@ -228,8 +214,7 @@ func testOrchestratePauseResume(t *testing.T, numProgress int) {
 				},
 			},
 		},
-		assignPartitionFunc,
-		slowPartitionStateFunc,
+		slowAssignPartitionFunc,
 		LowestWeightPartitionMoveForNode,
 	)
 	if err != nil || o == nil {
@@ -283,27 +268,26 @@ func TestOrchestratePauseResumeIntoMovesSupplier(t *testing.T) {
 }
 
 func testOrchestratePauseResumeIntoMovesSupplier(t *testing.T,
-	numProgressBeforePause, numFastPartitionStateFuncs int) {
-	_, _, assignPartitionFunc, partitionStateFunc := testMkFuncs()
+	numProgressBeforePause, numFastAssignPartitionFuncs int) {
+	_, _, assignPartitionFunc := testMkFuncs()
 
 	var m sync.Mutex
-	numPartitionStateFuncs := 0
+	numAssignPartitionFuncs := 0
 
 	slowCh := make(chan struct{})
 
-	slowPartitionStateFunc := func(stopCh chan struct{},
-		partition string, node string) (
-		state string, pct float32, err error) {
+	slowAssignPartitionFunc := func(stopCh chan struct{},
+		partition string, node string, state string, op string) error {
 		m.Lock()
-		numPartitionStateFuncs++
-		n := numPartitionStateFuncs
+		numAssignPartitionFuncs++
+		n := numAssignPartitionFuncs
 		m.Unlock()
 
-		if n > numFastPartitionStateFuncs {
+		if n > numFastAssignPartitionFuncs {
 			<-slowCh
 		}
 
-		return partitionStateFunc(stopCh, partition, node)
+		return assignPartitionFunc(stopCh, partition, node, state, op)
 	}
 
 	o, err := OrchestrateMoves(
@@ -342,8 +326,7 @@ func testOrchestratePauseResumeIntoMovesSupplier(t *testing.T,
 				},
 			},
 		},
-		assignPartitionFunc,
-		slowPartitionStateFunc,
+		slowAssignPartitionFunc,
 		LowestWeightPartitionMoveForNode,
 	)
 	if err != nil || o == nil {
@@ -391,96 +374,8 @@ func testOrchestratePauseResumeIntoMovesSupplier(t *testing.T,
 	}
 }
 
-func TestOrchestrateErrPartitionState(t *testing.T) {
-	_, _, assignPartitionFunc, _ := testMkFuncs()
-
-	theErr := fmt.Errorf("theErr")
-
-	errPartitionStateFunc := func(stopCh chan struct{},
-		partition string, node string) (
-		state string, pct float32, err error) {
-		return "", 0.0, theErr
-	}
-
-	o, err := OrchestrateMoves(
-		mrPartitionModel,
-		OrchestratorOptions{},
-		[]string{"a", "b"},
-		PartitionMap{
-			"00": &Partition{
-				Name: "00",
-				NodesByState: map[string][]string{
-					"master":  []string{"a"},
-					"replica": []string{"b"},
-				},
-			},
-			"01": &Partition{
-				Name: "01",
-				NodesByState: map[string][]string{
-					"master":  []string{"a"},
-					"replica": []string{"b"},
-				},
-			},
-			"02": &Partition{
-				Name: "02",
-				NodesByState: map[string][]string{
-					"master":  []string{"a"},
-					"replica": []string{"b"},
-				},
-			},
-		},
-		PartitionMap{
-			"00": &Partition{
-				Name: "00",
-				NodesByState: map[string][]string{
-					"master":  []string{"b"},
-					"replica": []string{"a"},
-				},
-			},
-			"01": &Partition{
-				Name: "01",
-				NodesByState: map[string][]string{
-					"master":  []string{"b"},
-					"replica": []string{"a"},
-				},
-			},
-			"02": &Partition{
-				Name: "02",
-				NodesByState: map[string][]string{
-					"master":  []string{"b"},
-					"replica": []string{"a"},
-				},
-			},
-		},
-		assignPartitionFunc,
-		errPartitionStateFunc,
-		LowestWeightPartitionMoveForNode,
-	)
-	if err != nil || o == nil {
-		t.Errorf("expected nil err")
-	}
-
-	gotProgress := 0
-	var lastProgress OrchestratorProgress
-
-	for progress := range o.ProgressCh() {
-		gotProgress++
-		lastProgress = progress
-	}
-
-	o.Stop()
-
-	if gotProgress <= 0 {
-		t.Errorf("expected progress")
-	}
-
-	if len(lastProgress.Errors) <= 0 {
-		t.Errorf("expected errs")
-	}
-}
-
 func TestOrchestrateEarlyStop(t *testing.T) {
-	_, _, assignPartitionFunc, partitionStateFunc := testMkFuncs()
+	_, _, assignPartitionFunc := testMkFuncs()
 
 	o, err := OrchestrateMoves(
 		mrPartitionModel,
@@ -503,7 +398,6 @@ func TestOrchestrateEarlyStop(t *testing.T) {
 			},
 		},
 		assignPartitionFunc,
-		partitionStateFunc,
 		LowestWeightPartitionMoveForNode,
 	)
 	if err != nil || o == nil {
@@ -1230,8 +1124,7 @@ func TestOrchestrateMoves(t *testing.T) {
 			continue
 		}
 
-		_, assignPartitionRecs,
-			assignPartitionFunc, partitionStateFunc := testMkFuncs()
+		_, assignPartitionRecs, assignPartitionFunc := testMkFuncs()
 
 		o, err := OrchestrateMoves(
 			test.partitionModel,
@@ -1240,7 +1133,6 @@ func TestOrchestrateMoves(t *testing.T) {
 			test.begMap,
 			test.endMap,
 			assignPartitionFunc,
-			partitionStateFunc,
 			LowestWeightPartitionMoveForNode,
 		)
 		if o == nil {
