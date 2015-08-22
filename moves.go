@@ -58,6 +58,11 @@ func CalcPartitionMoves(
 	adds := StringsRemoveStrings(endNodes, begNodes)
 	dels := StringsRemoveStrings(begNodes, endNodes)
 
+	// TODO: Should see if we can support apps that would rather want
+	// no overlap (no concurrent multi-node coverage of a partition),
+	// such as wanting just at most a single "master XOR replica" at
+	// any time for any partition.
+	//
 	for statei, state := range states {
 		// Handle demotions of superiorTo(state) to state.
 		addMoves(findStateChanges(0, statei,
