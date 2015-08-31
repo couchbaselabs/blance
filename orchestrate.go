@@ -415,10 +415,8 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 		})
 
 		select {
-		case _, ok := <-stopCh:
-			if !ok {
-				return nil
-			}
+		case <-stopCh:
+			return nil
 
 		case partitionMoveReq, ok := <-partitionMoveReqCh:
 			if !ok {
@@ -446,7 +444,12 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 
 			if partitionMoveReq.doneCh != nil {
 				if err != nil {
-					partitionMoveReq.doneCh <- err
+					select {
+					case <-stopCh:
+						// NO-OP.
+					case partitionMoveReq.doneCh <- err:
+						// NO-OP.
+					}
 				}
 
 				close(partitionMoveReq.doneCh)
@@ -481,7 +484,8 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 		}
 
 		// The main pause/resume handling is via pausing/resuming the
-		// runSupplyMoves loop.
+		// runSupplyMoves loop.  If caller needs to rebalancer.Stop()
+		// while paused, they should resume before Stop()'ing.
 		if pauseCh != nil {
 			o.updateProgress(func() {
 				o.progress.TotRunSupplyMovesPause++
