@@ -435,24 +435,20 @@ func (o *Orchestrator) moverLoop(stopCh chan struct{},
 
 			err := o.assignPartition(stopCh,
 				partition, node, state, partitionMove.Op)
-			if err != nil {
-				o.updateProgress(func() {
-					o.progress.TotMoverAssignPartitionErr++
-				})
-
-				if partitionMoveReq.doneCh != nil {
-					partitionMoveReq.doneCh <- err
-					close(partitionMoveReq.doneCh)
-				}
-
-				return err
-			}
 
 			o.updateProgress(func() {
-				o.progress.TotMoverAssignPartitionOk++
+				if err != nil {
+					o.progress.TotMoverAssignPartitionErr++
+				} else {
+					o.progress.TotMoverAssignPartitionOk++
+				}
 			})
 
 			if partitionMoveReq.doneCh != nil {
+				if err != nil {
+					partitionMoveReq.doneCh <- err
+				}
+
 				close(partitionMoveReq.doneCh)
 			}
 		}
