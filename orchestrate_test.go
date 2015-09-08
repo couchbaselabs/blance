@@ -107,6 +107,12 @@ func TestOrchestrateErrAssignPartitionFunc(t *testing.T) {
 	if len(lastProgress.Errors) <= 0 {
 		t.Errorf("expected errs")
 	}
+
+	o.VisitNextMoves(func(x map[string]*NextMoves) {
+		if x == nil {
+			t.Errorf("expected x")
+		}
+	})
 }
 
 func testMkFuncs() (

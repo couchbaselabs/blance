@@ -189,15 +189,6 @@ var MoveOpWeight = map[string]int{
 	"del":     4,
 }
 
-// ------------------------------------------
-
-// A partitionMoveReq wraps a partitionMove, allowing the receiver (a
-// mover) to signal that the move is completed by closing the doneCh.
-type partitionMoveReq struct {
-	partitionMove PartitionMove
-	doneCh        chan error
-}
-
 // A NextMoves struct is used to track a sequence of moves of a
 // partition, including the next move that that needs to be taken.
 type NextMoves struct {
@@ -216,6 +207,15 @@ type NextMoves struct {
 	// move supplier needs to wait for the nextDoneCh to be closed.
 	// The nextDoneCh == partitionMoveReq.doneCh.
 	nextDoneCh chan error
+}
+
+// ------------------------------------------
+
+// A partitionMoveReq wraps a partitionMove, allowing the receiver (a
+// mover) to signal that the move is completed by closing the doneCh.
+type partitionMoveReq struct {
+	partitionMove PartitionMove
+	doneCh        chan error
 }
 
 // ------------------------------------------
@@ -381,6 +381,19 @@ func (o *Orchestrator) ResumeNewAssignments() error {
 	o.m.Unlock()
 	return nil // TODO.
 }
+
+// -------------------------------------------------
+
+// VisitNextMoves invokes the supplied callback with the map of
+// partitions to *NextMoves, which should be treated as immutable by
+// the callback.
+func (o *Orchestrator) VisitNextMoves(cb func(map[string]*NextMoves)) {
+	o.m.Lock()
+	cb(o.mapPartitionToNextMoves)
+	o.m.Unlock()
+}
+
+// -------------------------------------------------
 
 // runMover handles partition moves for a single node.
 //
