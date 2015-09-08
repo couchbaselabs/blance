@@ -102,7 +102,7 @@ type Orchestrator struct {
 	progress OrchestratorProgress
 
 	// Keyed by partition name.
-	mapPartitionToNextMoves map[string]*nextMoves
+	mapPartitionToNextMoves map[string]*NextMoves
 }
 
 // OrchestratorOptions represents advanced config parameters for
@@ -198,24 +198,24 @@ type partitionMoveReq struct {
 	doneCh        chan error
 }
 
-// A nextMoves struct is used to track a sequence of moves of a
+// A NextMoves struct is used to track a sequence of moves of a
 // partition, including the next move that that needs to be taken.
-type nextMoves struct {
-	partition string // Immutable.
+type NextMoves struct {
+	Partition string // Immutable.
 
 	// Mutable index or current position in the moves array that
 	// represents the next available move for a partition.
-	next int
+	Next int
+
+	// The sequence of moves can come from the output of the
+	// CalcPartitionMoves() function and is immutable.
+	Moves []NodeStateOp
 
 	// When non-nil, it means the move is already in-flight (was
 	// successfully fed to a mover) but hasn't finished yet, and the
 	// move supplier needs to wait for the nextDoneCh to be closed.
 	// The nextDoneCh == partitionMoveReq.doneCh.
 	nextDoneCh chan error
-
-	// The sequence of moves can come from the output of the
-	// CalcPartitionMoves() function and is immutable.
-	moves []NodeStateOp
 }
 
 // ------------------------------------------
@@ -260,7 +260,7 @@ func OrchestrateMoves(
 	// As an analogy, this step calculates a bunch of airplane flight
 	// plans, without consideration to what the other airplanes are
 	// doing, where each flight plan has multi-city, multi-leg hops.
-	mapPartitionToNextMoves := map[string]*nextMoves{}
+	mapPartitionToNextMoves := map[string]*NextMoves{}
 
 	for partitionName, begPartition := range begMap {
 		endPartition := endMap[partitionName]
@@ -269,10 +269,10 @@ func OrchestrateMoves(
 			begPartition.NodesByState,
 			endPartition.NodesByState)
 
-		mapPartitionToNextMoves[partitionName] = &nextMoves{
-			partition: partitionName,
-			next:      0,
-			moves:     moves,
+		mapPartitionToNextMoves[partitionName] = &NextMoves{
+			Partition: partitionName,
+			Next:      0,
+			Moves:     moves,
 		}
 	}
 
@@ -571,11 +571,11 @@ func (o *Orchestrator) runSupplyMoves(stopCh chan struct{},
 // runSupplyMove tries to send a single partitionMoveReq to a single
 // node, along with handling the broadcast interruptions.
 func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
-	node string, nextMoves *nextMoves,
+	node string, nextMoves *NextMoves,
 	broadcastStopCh chan struct{},
 	broadcastDoneCh chan error) {
 	o.m.Lock()
-	nodeStateOp := nextMoves.moves[nextMoves.next]
+	nodeStateOp := nextMoves.Moves[nextMoves.Next]
 	nextDoneCh := nextMoves.nextDoneCh
 	o.m.Unlock()
 
@@ -584,7 +584,7 @@ func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
 
 		pmr := partitionMoveReq{
 			partitionMove: PartitionMove{
-				Partition: nextMoves.partition,
+				Partition: nextMoves.Partition,
 				Node:      nodeStateOp.Node,
 				State:     nodeStateOp.State,
 				Op:        nodeStateOp.Op,
@@ -618,7 +618,7 @@ func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
 	case err := <-nextDoneCh:
 		o.m.Lock()
 		nextMoves.nextDoneCh = nil
-		nextMoves.next++
+		nextMoves.Next++
 		o.m.Unlock()
 
 		broadcastDoneCh <- err
@@ -627,14 +627,14 @@ func (o *Orchestrator) runSupplyMove(stopCh chan struct{},
 
 // findNextMoves invokes the application's FindMoveFunc callback.
 func (o *Orchestrator) findNextMoves(
-	node string, nextMovesArr []*nextMoves) *nextMoves {
+	node string, nextMovesArr []*NextMoves) *NextMoves {
 	moves := make([]PartitionMove, len(nextMovesArr))
 
 	for i, nextMoves := range nextMovesArr {
-		m := nextMoves.moves[nextMoves.next]
+		m := nextMoves.Moves[nextMoves.Next]
 
 		moves[i] = PartitionMove{
-			Partition: nextMoves.partition,
+			Partition: nextMoves.Partition,
 			Node:      m.Node,
 			State:     m.State,
 			Op:        m.Op,
@@ -678,13 +678,13 @@ func (o *Orchestrator) updateProgress(f func()) {
 // findAvailableMoves_unlocked returns the next round of available
 // moves.
 func (o *Orchestrator) findAvailableMoves_unlocked() (
-	availableMoves map[string][]*nextMoves) {
+	availableMoves map[string][]*NextMoves) {
 	// The availableMoves is keyed by node name.
-	availableMoves = map[string][]*nextMoves{}
+	availableMoves = map[string][]*NextMoves{}
 
 	for _, nextMoves := range o.mapPartitionToNextMoves {
-		if nextMoves.next < len(nextMoves.moves) {
-			node := nextMoves.moves[nextMoves.next].Node
+		if nextMoves.Next < len(nextMoves.Moves) {
+			node := nextMoves.Moves[nextMoves.Next].Node
 			availableMoves[node] =
 				append(availableMoves[node], nextMoves)
 		}
