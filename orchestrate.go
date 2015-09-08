@@ -22,10 +22,8 @@ var ErrorInterrupt = errors.New("interrupt")
 
 /*
 We let the app have detailed control of the prioritization heuristics
-via the FindMoveFunc callback.
-
-But, there are some move prioritization heuristics for users of
-OrchestrateMoves to consider.
+via the FindMoveFunc callback.  Here are some move prioritization
+ideas or heuristics for FindMoveFunc implementors to consider.
 
 Some apps might first favor easy, single-node promotions and demotions
 (e.g., a replica partition graduating to master on the same node)
@@ -34,22 +32,22 @@ can have more coverage across all partitions.  The
 LowestWeightPartitionMoveForNode() implementation does this now.
 
 Next, favor assignments of partitions that have no replicas assigned
-anywhere, where we want to get to that first PIndex instance or
-replica as soon as possible. Once we have that first replica for a
-PIndex, though, we should consider favoring other kinds of moves over
-building even more replicas of that PIndex.
+anywhere, where we want to get to that first data partition instance
+or replica as soon as possible. Once we have that first replica for a
+data partition, though, we should consider favoring other kinds of
+moves over building even more replicas of that data partition.
 
 Next, favor reassignments that utilize capacity on newly added nodes,
 as the new nodes may be able to help with existing, overtaxed
-nodes. But be aware: starting off more KV backfills may push existing
-nodes running at the limit over the edge.
+nodes. But be aware: starting off more KV backfills, for example, may
+push existing nodes running at the limit over the edge.
 
-Next, favor reassignments that help get partitions off of nodes that are
-leaving the cluster. The idea is to allow ns-server to remove
-couchbase nodes (which may need servicing) sooner.
+Next, favor reassignments that help get partitions off of nodes that
+are leaving the cluster. The idea is to allow us to remove nodes
+(which may need servicing) sooner.
 
 Next, favor removals of partitions that are over-replicated. For
-example, there might be too many replicas of a PIndex remaining on
+example, there might be too many replicas of a partition remaining on
 new/existing nodes.
 
 Lastly, favor reassignments that move partitions amongst nodes than
