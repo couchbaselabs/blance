@@ -34,10 +34,18 @@ type NodeStateOp struct {
 // The begNodesByState and endNodesByState are keyed by stateName,
 // where the values are an array of node names.  For example,
 // {"master": ["a"], "replica": ["b", "c"]}.
+//
+// The favorMinNodes should be true if the moves should be computed to
+// have the partition assigned to the least number of nodes at any
+// time (i.e., favoring max of single mastership, if even there are
+// temporarily no masters for a time); if false, then the algorithm
+// will instead try to assign the partition to 1 or more nodes,
+// favoring partition availability across multiple nodes during moves.
 func CalcPartitionMoves(
 	states []string,
 	begNodesByState map[string][]string,
 	endNodesByState map[string][]string,
+	favorMinNodes bool,
 ) []NodeStateOp {
 	var moves []NodeStateOp
 
@@ -58,33 +66,56 @@ func CalcPartitionMoves(
 	adds := StringsRemoveStrings(endNodes, begNodes)
 	dels := StringsRemoveStrings(begNodes, endNodes)
 
-	// TODO: Should see if we can support apps that would rather want
-	// no overlap (no concurrent multi-node coverage of a partition),
-	// such as wanting just at most a single "master XOR replica" at
-	// any time for any partition.
-	//
-	for statei, state := range states {
-		// Handle demotions of superiorTo(state) to state.
-		addMoves(findStateChanges(0, statei,
-			state, states, begNodesByState, endNodesByState),
-			state, "demote")
+	if !favorMinNodes {
+		for statei, state := range states {
+			// Handle promotions of inferiorTo(state) to state.
+			addMoves(findStateChanges(statei+1, len(states),
+				state, states, begNodesByState, endNodesByState),
+				state, "promote")
 
-		// Handle promotions of inferiorTo(state) to state.
-		addMoves(findStateChanges(statei+1, len(states),
-			state, states, begNodesByState, endNodesByState),
-			state, "promote")
+			// Handle demotions of superiorTo(state) to state.
+			addMoves(findStateChanges(0, statei,
+				state, states, begNodesByState, endNodesByState),
+				state, "demote")
 
-		// Handle clean additions of state.
-		addMoves(StringsIntersectStrings(StringsRemoveStrings(
-			endNodesByState[state], begNodesByState[state]),
-			adds),
-			state, "add")
+			// Handle clean additions of state.
+			addMoves(StringsIntersectStrings(StringsRemoveStrings(
+				endNodesByState[state], begNodesByState[state]),
+				adds),
+				state, "add")
 
-		// Handle clean deletions of state.
-		addMoves(StringsIntersectStrings(StringsRemoveStrings(
-			begNodesByState[state], endNodesByState[state]),
-			dels),
-			"", "del")
+			// Handle clean deletions of state.
+			addMoves(StringsIntersectStrings(StringsRemoveStrings(
+				begNodesByState[state], endNodesByState[state]),
+				dels),
+				"", "del")
+		}
+	} else {
+		for statei := len(states) - 1; statei >= 0; statei-- {
+			state := states[statei]
+
+			// Handle clean deletions of state.
+			addMoves(StringsIntersectStrings(StringsRemoveStrings(
+				begNodesByState[state], endNodesByState[state]),
+				dels),
+				"", "del")
+
+			// Handle demotions of superiorTo(state) to state.
+			addMoves(findStateChanges(0, statei,
+				state, states, begNodesByState, endNodesByState),
+				state, "demote")
+
+			// Handle promotions of inferiorTo(state) to state.
+			addMoves(findStateChanges(statei+1, len(states),
+				state, states, begNodesByState, endNodesByState),
+				state, "promote")
+
+			// Handle clean additions of state.
+			addMoves(StringsIntersectStrings(StringsRemoveStrings(
+				endNodesByState[state], begNodesByState[state]),
+				adds),
+				state, "add")
+		}
 	}
 
 	return moves

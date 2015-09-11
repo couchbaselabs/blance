@@ -109,6 +109,9 @@ type Orchestrator struct {
 // OrchestrateMoves().
 type OrchestratorOptions struct {
 	MaxConcurrentPartitionMovesPerNode int
+
+	// See blance.CalcPartitionMoves(favorMinNodes).
+	FavorMinNodes bool
 }
 
 // OrchestratorProgress represents progress counters and/or error
@@ -267,7 +270,9 @@ func OrchestrateMoves(
 
 		moves := CalcPartitionMoves(states,
 			begPartition.NodesByState,
-			endPartition.NodesByState)
+			endPartition.NodesByState,
+			options.FavorMinNodes,
+		)
 
 		mapPartitionToNextMoves[partitionName] = &NextMoves{
 			Partition: partitionName,

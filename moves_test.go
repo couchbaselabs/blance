@@ -145,74 +145,166 @@ func TestCalcPartitionMoves(t *testing.T) {
 		before string
 		moves  string
 		after  string
+
+		favorMinNodes bool
 	}{
 		//  master | replica
 		//  -------|--------
+		{ // Test #0.
+			" a",
+			"",
+			" a",
+			false,
+		},
 		{
 			" a",
 			"",
 			" a",
+			true,
 		},
 		{
 			"      | a",
 			"",
 			"      | a",
+			false,
+		},
+		{
+			"      | a",
+			"",
+			"      | a",
+			true,
 		},
 		{
 			" a    | b",
 			"",
 			" a    | b",
+			false,
+		},
+		{ // Test #5.
+			" a    | b",
+			"",
+			" a    | b",
+			true,
 		},
 		{
 			"",
 			"+a",
 			" a",
+			false,
+		},
+		{
+			"",
+			"+a",
+			" a",
+			true,
 		},
 		{
 			" a",
 			"-a",
 			"",
+			false,
 		},
 		{
+			" a",
+			"-a",
+			"",
+			true,
+		},
+		{ // Test #10.
 			"",
 			`+a    |
 			  a    |+b`,
 			" a    | b",
+			false,
+		},
+		{
+			"",
+			`      |+b
+			 +a    | b`,
+			" a    | b",
+			true,
 		},
 		{
 			" a    | b",
 			` a    |-b`,
 			" a",
+			false,
+		},
+		{
+			" a    | b",
+			` a    |-b`,
+			" a",
+			true,
 		},
 		{
 			" a    | b",
 			`-a    | b`,
 			"      | b",
+			false,
+		},
+		{ // Test #15.
+			" a    | b",
+			`-a    | b`,
+			"      | b",
+			true,
 		},
 		{
 			" a    | b",
 			`-a    | b
 			       |-b`, // NOTE: Some may say we should remove replica first.
 			"",
+			false,
+		},
+		{
+			" a    | b",
+			` a    |-b
+			 -a    |`,
+			"",
+			true,
 		},
 		{
 			" a",
 			` a +b |
 			 -a  b |`,
 			"    b",
+			false,
 		},
 		{
+			" a",
+			`-a    |
+			    +b |`,
+			"    b",
+			true,
+		},
+		{ // Test #20.
 			" a    | b  c",
 			` a +b |-b  c
 			 -a  b |    c
 			     b |    c +d`,
 			"    b |    c  d",
+			false,
+		},
+		{ // Test #21.
+			" a    | b  c",
+			` a    | b  c +d
+			 -a    | b  c  d
+                +b |-b  c  d`,
+			"    b |    c  d",
+			true,
 		},
 		{
 			" a    |    b",
 			` a +b |   -b
 			 -a  b |+a`,
 			"    b | a",
+			false,
+		},
+		{
+			" a    |    b",
+			`-a    |+a  b
+			    +b | a -b`,
+			"    b | a",
+			true,
 		},
 		{
 			" a    |    b",
@@ -220,6 +312,15 @@ func TestCalcPartitionMoves(t *testing.T) {
 			 -a  c |+a  b
 			     c | a -b`,
 			"    c | a",
+			false,
+		},
+		{ // Test #25.
+			" a    |    b",
+			` a    |   -b
+             -a    |+a
+			    +c | a`,
+			"    c | a",
+			true,
 		},
 		{
 			" a    | b",
@@ -228,12 +329,23 @@ func TestCalcPartitionMoves(t *testing.T) {
 			     c | b +d
 			     c |-b  d`,
 			"    c |    d",
+			false,
+		},
+		{
+			" a    | b",
+			` a    |-b
+			  a    |   +d
+			 -a    |    d
+			    +c |    d`,
+			"    c |    d",
+			true,
 		},
 		{
 			" a    |    b",
 			`-a    |+a  b
 			       | a  b +c`,
 			"      | a  b  c",
+			false,
 		},
 	}
 
@@ -261,7 +373,7 @@ func TestCalcPartitionMoves(t *testing.T) {
 			}
 		}
 
-		movesGot := CalcPartitionMoves(states, before, after)
+		movesGot := CalcPartitionMoves(states, before, after, test.favorMinNodes)
 
 		if len(movesGot) != len(movesExp) {
 			t.Errorf("testi: %d, mismatch lengths,"+
