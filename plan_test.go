@@ -1965,6 +1965,28 @@ func TestPlanNextMapVis(t *testing.T) {
 			Model:            partitionModel1Master1Slave,
 			expNumWarnings:   0,
 		},
+		{
+			// Masters stayed nicely stable during node removal.
+			// TODO: But, perhaps node a has too much load.
+			About: "4 nodes to 3 nodes, remove node d, high stickiness",
+			FromTo: [][]string{
+				//        abcd    abc
+				[]string{" m s", "sm "},
+				[]string{"  ms", "s m"},
+				[]string{"s  m", "m s"},
+				[]string{" ms ", " ms"},
+				[]string{" sm ", " sm"},
+				[]string{"s  m", "sm "},
+				[]string{"ms  ", "ms "},
+				[]string{"m s ", "m s"},
+			},
+			Nodes:           []string{"a", "b", "c", "d"},
+			NodesToRemove:   []string{"d"},
+			NodesToAdd:      []string{},
+			Model:           partitionModel1Master1Slave,
+			StateStickiness: map[string]int{"master": 1000000},
+			expNumWarnings: 0,
+		},
 	}
 	testVisTestCases(t, tests)
 }
