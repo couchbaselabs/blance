@@ -1985,7 +1985,7 @@ func TestPlanNextMapVis(t *testing.T) {
 			NodesToAdd:      []string{},
 			Model:           partitionModel1Master1Slave,
 			StateStickiness: map[string]int{"master": 1000000},
-			expNumWarnings: 0,
+			expNumWarnings:  0,
 		},
 	}
 	testVisTestCases(t, tests)
