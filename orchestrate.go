@@ -371,7 +371,7 @@ func (o *Orchestrator) PauseNewAssignments() error {
 		o.progress.TotPauseNewAssignments++
 	}
 	o.m.Unlock()
-	return nil
+	return nil // TODO: error if not pausable.
 }
 
 // ResumeNewAssignments tells the orchestrator that it may resume
@@ -384,7 +384,7 @@ func (o *Orchestrator) ResumeNewAssignments() error {
 		o.pauseCh = nil
 	}
 	o.m.Unlock()
-	return nil // TODO.
+	return nil // TODO: error if wasn't paused?
 }
 
 // -------------------------------------------------
